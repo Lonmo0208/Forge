@@ -1,23 +1,21 @@
 /*
- * Copyright (c) Forge Development LLC and contributors
+ * Minecraft Forge - Forge Development LLC
  * SPDX-License-Identifier: LGPL-2.1-only
  */
 
 package net.minecraftforge.client.textures;
 
+import javax.annotation.Nonnull;
+
 import com.mojang.blaze3d.platform.NativeImage;
-import net.minecraft.client.renderer.texture.SpriteContents;
+import net.minecraft.client.renderer.texture.TextureAtlas;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
-import net.minecraft.client.resources.metadata.animation.FrameSize;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.packs.resources.Resource;
-import net.minecraft.server.packs.resources.ResourceMetadata;
-import net.minecraftforge.client.event.RegisterTextureAtlasSpriteLoadersEvent;
-import org.jetbrains.annotations.NotNull;
+import net.minecraft.server.packs.resources.ResourceManager;
 
 /**
- * A loader for custom {@linkplain TextureAtlasSprite texture atlas sprites}.
- * <p>
+ * A loader for custom TextureAtlasSprite implementations.<br>
  * The loader can be specified in the corresponding .mcmeta file for a texture as follows:
  * <pre>
  * {
@@ -26,15 +24,22 @@ import org.jetbrains.annotations.NotNull;
  *   }
  * }
  * </pre>
- *
- * @see RegisterTextureAtlasSpriteLoadersEvent
+ * @see net.minecraftforge.client.MinecraftForgeClient#registerTextureAtlasSpriteLoader(ResourceLocation, ITextureAtlasSpriteLoader)
  */
-public interface ITextureAtlasSpriteLoader {
-    SpriteContents loadContents(ResourceLocation name, Resource resource, FrameSize frameSize, NativeImage image, ResourceMetadata animationMeta, ForgeTextureMetadata forgeMeta);
+public interface ITextureAtlasSpriteLoader
+{
 
     /**
-     * Creates a {@link TextureAtlasSprite} from the given {@link SpriteContents}.
+     * Load a TextureAtlasSprite for the given resource.
      */
-    @NotNull
-    TextureAtlasSprite makeSprite(ResourceLocation atlasName, SpriteContents contents, int atlasWidth, int atlasHeight, int spriteX, int spriteY, int mipmapLevel);
+    @Nonnull
+    TextureAtlasSprite load(
+            TextureAtlas atlas,
+            ResourceManager resourceManager, TextureAtlasSprite.Info textureInfo,
+            Resource resource,
+            int atlasWidth, int atlasHeight,
+            int spriteX, int spriteY, int mipmapLevel,
+            NativeImage image
+    );
+
 }

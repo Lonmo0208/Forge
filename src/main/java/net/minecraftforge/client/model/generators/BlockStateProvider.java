@@ -1,10 +1,28 @@
 /*
- * Copyright (c) Forge Development LLC and contributors
+ * Minecraft Forge - Forge Development LLC
  * SPDX-License-Identifier: LGPL-2.1-only
  */
 
 package net.minecraftforge.client.model.generators;
 
+import java.io.IOException;
+import java.nio.file.Path;
+import java.util.Arrays;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
+
+import javax.annotation.Nonnull;
+
+import net.minecraft.world.level.block.ButtonBlock;
+import net.minecraft.world.level.block.PressurePlateBlock;
+import net.minecraft.world.level.block.StandingSignBlock;
+import net.minecraft.world.level.block.WallSignBlock;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -14,112 +32,82 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 
-import java.nio.file.Path;
-import java.util.Arrays;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.CompletableFuture;
-import java.util.function.Function;
-import net.minecraft.core.Direction;
-import net.minecraft.core.Direction.Axis;
-import net.minecraft.data.CachedOutput;
-import net.minecraft.data.DataProvider;
-import net.minecraft.data.PackOutput;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.block.Block;
-import net.minecraft.world.level.block.ButtonBlock;
-import net.minecraft.world.level.block.CrossCollisionBlock;
+import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.DoorBlock;
 import net.minecraft.world.level.block.FenceBlock;
 import net.minecraft.world.level.block.FenceGateBlock;
+import net.minecraft.world.level.block.CrossCollisionBlock;
 import net.minecraft.world.level.block.IronBarsBlock;
-import net.minecraft.world.level.block.PipeBlock;
-import net.minecraft.world.level.block.PressurePlateBlock;
 import net.minecraft.world.level.block.RotatedPillarBlock;
+import net.minecraft.world.level.block.PipeBlock;
 import net.minecraft.world.level.block.SlabBlock;
 import net.minecraft.world.level.block.StairBlock;
-import net.minecraft.world.level.block.StandingSignBlock;
 import net.minecraft.world.level.block.TrapDoorBlock;
 import net.minecraft.world.level.block.WallBlock;
-import net.minecraft.world.level.block.WallSignBlock;
-import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.properties.WallSide;
+import net.minecraft.data.DataGenerator;
+import net.minecraft.data.HashCache;
+import net.minecraft.data.DataProvider;
+import net.minecraft.world.level.block.state.properties.Property;
 import net.minecraft.world.level.block.state.properties.AttachFace;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.level.block.state.properties.DoorHingeSide;
 import net.minecraft.world.level.block.state.properties.DoubleBlockHalf;
 import net.minecraft.world.level.block.state.properties.Half;
-import net.minecraft.world.level.block.state.properties.Property;
 import net.minecraft.world.level.block.state.properties.SlabType;
 import net.minecraft.world.level.block.state.properties.StairsShape;
-import net.minecraft.world.level.block.state.properties.WallSide;
+import net.minecraft.core.Direction;
+import net.minecraft.core.Direction.Axis;
 import net.minecraftforge.common.data.ExistingFileHelper;
-import net.minecraftforge.registries.ForgeRegistries;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.VisibleForTesting;
+import net.minecraft.resources.ResourceLocation;
 
 /**
  * Data provider for blockstate files. Extends {@link BlockModelProvider} so that
  * blockstates and their referenced models can be provided in tandem.
- *
- * In 1.21.4 Mojang exposed their data generators for their models. So it should be feasible to just use theirs.
- * If you find something lacking feel free to open a PR so that we can extend it.
- * @deprecated Use Vanilla's providers {@link net.minecraft.client.data.models.ModelProvider}
  */
-@Deprecated(since = "1.21.4", forRemoval = true)
 public abstract class BlockStateProvider implements DataProvider {
 
-    @SuppressWarnings("unused")
     private static final Logger LOGGER = LogManager.getLogger();
-    @SuppressWarnings("unused")
     private static final Gson GSON = (new GsonBuilder()).setPrettyPrinting().disableHtmlEscaping().create();
 
     @VisibleForTesting
-    protected final Map<Block, IGeneratedBlockState> registeredBlocks = new LinkedHashMap<>();
+    protected final Map<Block, IGeneratedBlockstate> registeredBlocks = new LinkedHashMap<>();
 
-    private final PackOutput output;
+    private final DataGenerator generator;
     private final String modid;
     private final BlockModelProvider blockModels;
     private final ItemModelProvider itemModels;
 
-    public BlockStateProvider(PackOutput output, String modid, ExistingFileHelper exFileHelper) {
-        this.output = output;
+    public BlockStateProvider(DataGenerator gen, String modid, ExistingFileHelper exFileHelper) {
+        this.generator = gen;
         this.modid = modid;
-        this.blockModels = new BlockModelProvider(output, modid, exFileHelper) {
-            @Override public CompletableFuture<?> run(CachedOutput cache) { return CompletableFuture.allOf(); }
-
+        this.blockModels = new BlockModelProvider(gen, modid, exFileHelper) {
             @Override protected void registerModels() {}
         };
-        this.itemModels = new ItemModelProvider(output, modid, this.blockModels.existingFileHelper) {
+        this.itemModels = new ItemModelProvider(gen, modid, this.blockModels.existingFileHelper) {
             @Override protected void registerModels() {}
-
-            @Override public CompletableFuture<?> run(CachedOutput cache) { return CompletableFuture.allOf(); }
         };
     }
 
     @Override
-    public CompletableFuture<?> run(CachedOutput cache) {
+    public void run(HashCache cache) throws IOException {
         models().clear();
         itemModels().clear();
         registeredBlocks.clear();
         registerStatesAndModels();
-        CompletableFuture<?>[] futures = new CompletableFuture<?>[2 + this.registeredBlocks.size()];
-        int i = 0;
-        futures[i++] = models().generateAll(cache);
-        futures[i++] = itemModels().generateAll(cache);
-        for (Map.Entry<Block, IGeneratedBlockState> entry : registeredBlocks.entrySet()) {
-            futures[i++] = saveBlockState(cache, entry.getValue().toJson(), entry.getKey());
+        models().generateAll(cache);
+        itemModels().generateAll(cache);
+        for (Map.Entry<Block, IGeneratedBlockstate> entry : registeredBlocks.entrySet()) {
+            saveBlockState(cache, entry.getValue().toJson(), entry.getKey());
         }
-        return CompletableFuture.allOf(futures);
     }
 
     protected abstract void registerStatesAndModels();
 
     public VariantBlockStateBuilder getVariantBuilder(Block b) {
         if (registeredBlocks.containsKey(b)) {
-            IGeneratedBlockState old = registeredBlocks.get(b);
+            IGeneratedBlockstate old = registeredBlocks.get(b);
             Preconditions.checkState(old instanceof VariantBlockStateBuilder);
             return (VariantBlockStateBuilder) old;
         } else {
@@ -131,7 +119,7 @@ public abstract class BlockStateProvider implements DataProvider {
 
     public MultiPartBlockStateBuilder getMultipartBuilder(Block b) {
         if (registeredBlocks.containsKey(b)) {
-            IGeneratedBlockState old = registeredBlocks.get(b);
+            IGeneratedBlockstate old = registeredBlocks.get(b);
             Preconditions.checkState(old instanceof MultiPartBlockStateBuilder);
             return (MultiPartBlockStateBuilder) old;
         } else {
@@ -150,27 +138,24 @@ public abstract class BlockStateProvider implements DataProvider {
     }
 
     public ResourceLocation modLoc(String name) {
-        return ResourceLocation.fromNamespaceAndPath(modid, name);
+        return new ResourceLocation(modid, name);
     }
 
     public ResourceLocation mcLoc(String name) {
-        return ResourceLocation.parse(name);
-    }
-
-    private ResourceLocation key(Block block) {
-        return ForgeRegistries.BLOCKS.getKey(block);
+        return new ResourceLocation(name);
     }
 
     private String name(Block block) {
-        return key(block).getPath();
+        return block.getRegistryName().getPath();
     }
 
     public ResourceLocation blockTexture(Block block) {
-        return key(block).withPath(p -> ModelProvider.BLOCK_FOLDER + '/' + p);
+        ResourceLocation name = block.getRegistryName();
+        return new ResourceLocation(name.getNamespace(), ModelProvider.BLOCK_FOLDER + "/" + name.getPath());
     }
 
     private ResourceLocation extend(ResourceLocation rl, String suffix) {
-        return rl.withSuffix(suffix);
+        return new ResourceLocation(rl.getNamespace(), rl.getPath() + suffix);
     }
 
     public ModelFile cubeAll(Block block) {
@@ -190,12 +175,7 @@ public abstract class BlockStateProvider implements DataProvider {
     }
 
     public void simpleBlockItem(Block block, ModelFile model) {
-        itemModels().getBuilder(key(block).getPath()).parent(model);
-    }
-
-    public void simpleBlockWithItem(Block block, ModelFile model) {
-        simpleBlock(block, model);
-        simpleBlockItem(block, model);
+        itemModels().getBuilder(block.getRegistryName().getPath()).parent(model);
     }
 
     public void simpleBlock(Block block, ConfiguredModel... models) {
@@ -216,45 +196,7 @@ public abstract class BlockStateProvider implements DataProvider {
     }
 
     public void axisBlock(RotatedPillarBlock block, ResourceLocation side, ResourceLocation end) {
-        axisBlock(block,
-            models().cubeColumn(name(block), side, end),
-            models().cubeColumnHorizontal(name(block) + "_horizontal", side, end));
-    }
-
-    public void axisBlockWithRenderType(RotatedPillarBlock block, String renderType) {
-        axisBlockWithRenderType(block, blockTexture(block), renderType);
-    }
-
-    public void logBlockWithRenderType(RotatedPillarBlock block, String renderType) {
-        axisBlockWithRenderType(block, blockTexture(block), extend(blockTexture(block), "_top"), renderType);
-    }
-
-    public void axisBlockWithRenderType(RotatedPillarBlock block, ResourceLocation baseName, String renderType) {
-        axisBlockWithRenderType(block, extend(baseName, "_side"), extend(baseName, "_end"), renderType);
-    }
-
-    public void axisBlockWithRenderType(RotatedPillarBlock block, ResourceLocation side, ResourceLocation end, String renderType) {
-        axisBlock(block,
-            models().cubeColumn(name(block), side, end).renderType(renderType),
-            models().cubeColumnHorizontal(name(block) + "_horizontal", side, end).renderType(renderType));
-    }
-
-    public void axisBlockWithRenderType(RotatedPillarBlock block, ResourceLocation renderType) {
-        axisBlockWithRenderType(block, blockTexture(block), renderType);
-    }
-
-    public void logBlockWithRenderType(RotatedPillarBlock block, ResourceLocation renderType) {
-        axisBlockWithRenderType(block, blockTexture(block), extend(blockTexture(block), "_top"), renderType);
-    }
-
-    public void axisBlockWithRenderType(RotatedPillarBlock block, ResourceLocation baseName, ResourceLocation renderType) {
-        axisBlockWithRenderType(block, extend(baseName, "_side"), extend(baseName, "_end"), renderType);
-    }
-
-    public void axisBlockWithRenderType(RotatedPillarBlock block, ResourceLocation side, ResourceLocation end, ResourceLocation renderType) {
-        axisBlock(block,
-            models().cubeColumn(name(block), side, end).renderType(renderType),
-            models().cubeColumnHorizontal(name(block) + "_horizontal", side, end).renderType(renderType));
+        axisBlock(block, models().cubeColumn(name(block), side, end), models().cubeColumnHorizontal(name(block) + "_horizontal", side, end));
     }
 
     public void axisBlock(RotatedPillarBlock block, ModelFile vertical, ModelFile horizontal) {
@@ -349,56 +291,17 @@ public abstract class BlockStateProvider implements DataProvider {
     }
 
     public void stairsBlock(StairBlock block, ResourceLocation side, ResourceLocation bottom, ResourceLocation top) {
-        stairsBlockInternal(block, key(block).toString(), side, bottom, top);
+        stairsBlockInternal(block, block.getRegistryName().toString(), side, bottom, top);
     }
 
     public void stairsBlock(StairBlock block, String name, ResourceLocation side, ResourceLocation bottom, ResourceLocation top) {
         stairsBlockInternal(block, name + "_stairs", side, bottom, top);
     }
 
-    public void stairsBlockWithRenderType(StairBlock block, ResourceLocation texture, String renderType) {
-        stairsBlockWithRenderType(block, texture, texture, texture, renderType);
-    }
-
-    public void stairsBlockWithRenderType(StairBlock block, String name, ResourceLocation texture, String renderType) {
-        stairsBlockWithRenderType(block, name, texture, texture, texture, renderType);
-    }
-
-    public void stairsBlockWithRenderType(StairBlock block, ResourceLocation side, ResourceLocation bottom, ResourceLocation top, String renderType) {
-        stairsBlockInternalWithRenderType(block, key(block).toString(), side, bottom, top, ResourceLocation.tryParse(renderType));
-    }
-
-    public void stairsBlockWithRenderType(StairBlock block, String name, ResourceLocation side, ResourceLocation bottom, ResourceLocation top, String renderType) {
-        stairsBlockInternalWithRenderType(block, name + "_stairs", side, bottom, top, ResourceLocation.tryParse(renderType));
-    }
-
-    public void stairsBlockWithRenderType(StairBlock block, ResourceLocation texture, ResourceLocation renderType) {
-        stairsBlockWithRenderType(block, texture, texture, texture, renderType);
-    }
-
-    public void stairsBlockWithRenderType(StairBlock block, String name, ResourceLocation texture, ResourceLocation renderType) {
-        stairsBlockWithRenderType(block, name, texture, texture, texture, renderType);
-    }
-
-    public void stairsBlockWithRenderType(StairBlock block, ResourceLocation side, ResourceLocation bottom, ResourceLocation top, ResourceLocation renderType) {
-        stairsBlockInternalWithRenderType(block, key(block).toString(), side, bottom, top, renderType);
-    }
-
-    public void stairsBlockWithRenderType(StairBlock block, String name, ResourceLocation side, ResourceLocation bottom, ResourceLocation top, ResourceLocation renderType) {
-        stairsBlockInternalWithRenderType(block, name + "_stairs", side, bottom, top, renderType);
-    }
-
     private void stairsBlockInternal(StairBlock block, String baseName, ResourceLocation side, ResourceLocation bottom, ResourceLocation top) {
         ModelFile stairs = models().stairs(baseName, side, bottom, top);
         ModelFile stairsInner = models().stairsInner(baseName + "_inner", side, bottom, top);
         ModelFile stairsOuter = models().stairsOuter(baseName + "_outer", side, bottom, top);
-        stairsBlock(block, stairs, stairsInner, stairsOuter);
-    }
-
-    private void stairsBlockInternalWithRenderType(StairBlock block, String baseName, ResourceLocation side, ResourceLocation bottom, ResourceLocation top, ResourceLocation renderType) {
-        ModelFile stairs = models().stairs(baseName, side, bottom, top).renderType(renderType);
-        ModelFile stairsInner = models().stairsInner(baseName + "_inner", side, bottom, top).renderType(renderType);
-        ModelFile stairsOuter = models().stairsOuter(baseName + "_outer", side, bottom, top).renderType(renderType);
         stairsBlock(block, stairs, stairsInner, stairsOuter);
     }
 
@@ -501,66 +404,20 @@ public abstract class BlockStateProvider implements DataProvider {
     }
 
     public void fenceBlock(FenceBlock block, ResourceLocation texture) {
-        String baseName = key(block).toString();
-        fourWayBlock(block,
-            models().fencePost(baseName + "_post", texture),
-            models().fenceSide(baseName + "_side", texture));
+        String baseName = block.getRegistryName().toString();
+        fourWayBlock(block, models().fencePost(baseName + "_post", texture), models().fenceSide(baseName + "_side", texture));
     }
 
     public void fenceBlock(FenceBlock block, String name, ResourceLocation texture) {
-        fourWayBlock(block,
-            models().fencePost(name + "_fence_post", texture),
-            models().fenceSide(name + "_fence_side", texture));
-    }
-
-    public void fenceBlockWithRenderType(FenceBlock block, ResourceLocation texture, String renderType) {
-        String baseName = key(block).toString();
-        fourWayBlock(block,
-            models().fencePost(baseName + "_post", texture).renderType(renderType),
-            models().fenceSide(baseName + "_side", texture).renderType(renderType));
-    }
-
-    public void fenceBlockWithRenderType(FenceBlock block, String name, ResourceLocation texture, String renderType) {
-        fourWayBlock(block,
-            models().fencePost(name + "_fence_post", texture).renderType(renderType),
-            models().fenceSide(name + "_fence_side", texture).renderType(renderType));
-    }
-
-    public void fenceBlockWithRenderType(FenceBlock block, ResourceLocation texture, ResourceLocation renderType) {
-        String baseName = key(block).toString();
-        fourWayBlock(block,
-            models().fencePost(baseName + "_post", texture).renderType(renderType),
-            models().fenceSide(baseName + "_side", texture).renderType(renderType));
-    }
-
-    public void fenceBlockWithRenderType(FenceBlock block, String name, ResourceLocation texture, ResourceLocation renderType) {
-        fourWayBlock(block,
-            models().fencePost(name + "_fence_post", texture).renderType(renderType),
-            models().fenceSide(name + "_fence_side", texture).renderType(renderType));
+        fourWayBlock(block, models().fencePost(name + "_fence_post", texture), models().fenceSide(name + "_fence_side", texture));
     }
 
     public void fenceGateBlock(FenceGateBlock block, ResourceLocation texture) {
-        fenceGateBlockInternal(block, key(block).toString(), texture);
+        fenceGateBlockInternal(block, block.getRegistryName().toString(), texture);
     }
 
     public void fenceGateBlock(FenceGateBlock block, String name, ResourceLocation texture) {
         fenceGateBlockInternal(block, name + "_fence_gate", texture);
-    }
-
-    public void fenceGateBlockWithRenderType(FenceGateBlock block, ResourceLocation texture, String renderType) {
-        fenceGateBlockInternalWithRenderType(block, key(block).toString(), texture, ResourceLocation.tryParse(renderType));
-    }
-
-    public void fenceGateBlockWithRenderType(FenceGateBlock block, String name, ResourceLocation texture, String renderType) {
-        fenceGateBlockInternalWithRenderType(block, name + "_fence_gate", texture, ResourceLocation.tryParse(renderType));
-    }
-
-    public void fenceGateBlockWithRenderType(FenceGateBlock block, ResourceLocation texture, ResourceLocation renderType) {
-        fenceGateBlockInternalWithRenderType(block, key(block).toString(), texture, renderType);
-    }
-
-    public void fenceGateBlockWithRenderType(FenceGateBlock block, String name, ResourceLocation texture, ResourceLocation renderType) {
-        fenceGateBlockInternalWithRenderType(block, name + "_fence_gate", texture, renderType);
     }
 
     private void fenceGateBlockInternal(FenceGateBlock block, String baseName, ResourceLocation texture) {
@@ -568,14 +425,6 @@ public abstract class BlockStateProvider implements DataProvider {
         ModelFile gateOpen = models().fenceGateOpen(baseName + "_open", texture);
         ModelFile gateWall = models().fenceGateWall(baseName + "_wall", texture);
         ModelFile gateWallOpen = models().fenceGateWallOpen(baseName + "_wall_open", texture);
-        fenceGateBlock(block, gate, gateOpen, gateWall, gateWallOpen);
-    }
-
-    private void fenceGateBlockInternalWithRenderType(FenceGateBlock block, String baseName, ResourceLocation texture, ResourceLocation renderType) {
-        ModelFile gate = models().fenceGate(baseName, texture).renderType(renderType);
-        ModelFile gateOpen = models().fenceGateOpen(baseName + "_open", texture).renderType(renderType);
-        ModelFile gateWall = models().fenceGateWall(baseName + "_wall", texture).renderType(renderType);
-        ModelFile gateWallOpen = models().fenceGateWallOpen(baseName + "_wall_open", texture).renderType(renderType);
         fenceGateBlock(block, gate, gateOpen, gateWall, gateWallOpen);
     }
 
@@ -597,91 +446,51 @@ public abstract class BlockStateProvider implements DataProvider {
     }
 
     public void wallBlock(WallBlock block, ResourceLocation texture) {
-        wallBlockInternal(block, key(block).toString(), texture);
+        wallBlockInternal(block, block.getRegistryName().toString(), texture);
     }
 
     public void wallBlock(WallBlock block, String name, ResourceLocation texture) {
         wallBlockInternal(block, name + "_wall", texture);
     }
 
-    public void wallBlockWithRenderType(WallBlock block, ResourceLocation texture, String renderType) {
-        wallBlockInternalWithRenderType(block, key(block).toString(), texture, ResourceLocation.tryParse(renderType));
-    }
-
-    public void wallBlockWithRenderType(WallBlock block, String name, ResourceLocation texture, String renderType) {
-        wallBlockInternalWithRenderType(block, name + "_wall", texture, ResourceLocation.tryParse(renderType));
-    }
-
-    public void wallBlockWithRenderType(WallBlock block, ResourceLocation texture, ResourceLocation renderType) {
-        wallBlockInternalWithRenderType(block, key(block).toString(), texture, renderType);
-    }
-
-    public void wallBlockWithRenderType(WallBlock block, String name, ResourceLocation texture, ResourceLocation renderType) {
-        wallBlockInternalWithRenderType(block, name + "_wall", texture, renderType);
-    }
-
     private void wallBlockInternal(WallBlock block, String baseName, ResourceLocation texture) {
-        wallBlock(block, models().wallPost(baseName + "_post", texture),
-            models().wallSide(baseName + "_side", texture),
-            models().wallSideTall(baseName + "_side_tall", texture));
+        wallBlock(block, models().wallPost(baseName + "_post", texture), models().wallSide(baseName + "_side", texture), models().wallSideTall(baseName + "_side_tall", texture));
     }
-
-    private void wallBlockInternalWithRenderType(WallBlock block, String baseName, ResourceLocation texture, ResourceLocation renderType) {
-        wallBlock(block, models().wallPost(baseName + "_post", texture).renderType(renderType),
-            models().wallSide(baseName + "_side", texture).renderType(renderType),
-            models().wallSideTall(baseName + "_side_tall", texture).renderType(renderType));
-    }
-
+    
     public static final ImmutableMap<Direction, Property<WallSide>> WALL_PROPS = ImmutableMap.<Direction, Property<WallSide>>builder()
-            .put(Direction.EAST,  BlockStateProperties.EAST_WALL)
-            .put(Direction.NORTH, BlockStateProperties.NORTH_WALL)
-            .put(Direction.SOUTH, BlockStateProperties.SOUTH_WALL)
-            .put(Direction.WEST,  BlockStateProperties.WEST_WALL)
-            .build();
+    		.put(Direction.EAST,  BlockStateProperties.EAST_WALL)
+    		.put(Direction.NORTH, BlockStateProperties.NORTH_WALL)
+    		.put(Direction.SOUTH, BlockStateProperties.SOUTH_WALL)
+    		.put(Direction.WEST,  BlockStateProperties.WEST_WALL)
+    		.build();
 
     public void wallBlock(WallBlock block, ModelFile post, ModelFile side, ModelFile sideTall) {
         MultiPartBlockStateBuilder builder = getMultipartBuilder(block)
                 .part().modelFile(post).addModel()
                     .condition(WallBlock.UP, true).end();
         WALL_PROPS.entrySet().stream()
-            .filter(e -> e.getKey().getAxis().isHorizontal())
-            .forEach(e -> {
-                wallSidePart(builder, side, e, WallSide.LOW);
-                wallSidePart(builder, sideTall, e, WallSide.TALL);
-            });
+        	.filter(e -> e.getKey().getAxis().isHorizontal())
+        	.forEach(e -> {
+        		wallSidePart(builder, side, e, WallSide.LOW);
+        		wallSidePart(builder, sideTall, e, WallSide.TALL);
+        	});
     }
-
+    
     private void wallSidePart(MultiPartBlockStateBuilder builder, ModelFile model, Map.Entry<Direction, Property<WallSide>> entry, WallSide height) {
         builder.part()
-            .modelFile(model)
-                .rotationY((((int) entry.getKey().toYRot()) + 180) % 360)
-                .uvLock(true)
-                .addModel()
-            .condition(entry.getValue(), height);
+        	.modelFile(model)
+        		.rotationY((((int) entry.getKey().toYRot()) + 180) % 360)
+        		.uvLock(true)
+        		.addModel()
+    		.condition(entry.getValue(), height);
     }
 
     public void paneBlock(IronBarsBlock block, ResourceLocation pane, ResourceLocation edge) {
-        paneBlockInternal(block, key(block).toString(), pane, edge);
+        paneBlockInternal(block, block.getRegistryName().toString(), pane, edge);
     }
 
     public void paneBlock(IronBarsBlock block, String name, ResourceLocation pane, ResourceLocation edge) {
         paneBlockInternal(block, name + "_pane", pane, edge);
-    }
-
-    public void paneBlockWithRenderType(IronBarsBlock block, ResourceLocation pane, ResourceLocation edge, String renderType) {
-        paneBlockInternalWithRenderType(block, key(block).toString(), pane, edge, ResourceLocation.tryParse(renderType));
-    }
-
-    public void paneBlockWithRenderType(IronBarsBlock block, String name, ResourceLocation pane, ResourceLocation edge, String renderType) {
-        paneBlockInternalWithRenderType(block, name + "_pane", pane, edge, ResourceLocation.tryParse(renderType));
-    }
-
-    public void paneBlockWithRenderType(IronBarsBlock block, ResourceLocation pane, ResourceLocation edge, ResourceLocation renderType) {
-        paneBlockInternalWithRenderType(block, key(block).toString(), pane, edge, renderType);
-    }
-
-    public void paneBlockWithRenderType(IronBarsBlock block, String name, ResourceLocation pane, ResourceLocation edge, ResourceLocation renderType) {
-        paneBlockInternalWithRenderType(block, name + "_pane", pane, edge, renderType);
     }
 
     private void paneBlockInternal(IronBarsBlock block, String baseName, ResourceLocation pane, ResourceLocation edge) {
@@ -693,155 +502,68 @@ public abstract class BlockStateProvider implements DataProvider {
         paneBlock(block, post, side, sideAlt, noSide, noSideAlt);
     }
 
-    private void paneBlockInternalWithRenderType(IronBarsBlock block, String baseName, ResourceLocation pane, ResourceLocation edge, ResourceLocation renderType) {
-        ModelFile post = models().panePost(baseName + "_post", pane, edge).renderType(renderType);
-        ModelFile side = models().paneSide(baseName + "_side", pane, edge).renderType(renderType);
-        ModelFile sideAlt = models().paneSideAlt(baseName + "_side_alt", pane, edge).renderType(renderType);
-        ModelFile noSide = models().paneNoSide(baseName + "_noside", pane).renderType(renderType);
-        ModelFile noSideAlt = models().paneNoSideAlt(baseName + "_noside_alt", pane).renderType(renderType);
-        paneBlock(block, post, side, sideAlt, noSide, noSideAlt);
-    }
-
     public void paneBlock(IronBarsBlock block, ModelFile post, ModelFile side, ModelFile sideAlt, ModelFile noSide, ModelFile noSideAlt) {
         MultiPartBlockStateBuilder builder = getMultipartBuilder(block)
-            .part().modelFile(post).addModel().end();
+                .part().modelFile(post).addModel().end();
         PipeBlock.PROPERTY_BY_DIRECTION.entrySet().forEach(e -> {
             Direction dir = e.getKey();
             if (dir.getAxis().isHorizontal()) {
                 boolean alt = dir == Direction.SOUTH;
                 builder.part().modelFile(alt || dir == Direction.WEST ? sideAlt : side).rotationY(dir.getAxis() == Axis.X ? 90 : 0).addModel()
                     .condition(e.getValue(), true).end()
-                    .part().modelFile(alt || dir == Direction.EAST ? noSideAlt : noSide).rotationY(dir == Direction.WEST ? 270 : dir == Direction.SOUTH ? 90 : 0).addModel()
+                .part().modelFile(alt || dir == Direction.EAST ? noSideAlt : noSide).rotationY(dir == Direction.WEST ? 270 : dir == Direction.SOUTH ? 90 : 0).addModel()
                     .condition(e.getValue(), false);
             }
         });
     }
 
     public void doorBlock(DoorBlock block, ResourceLocation bottom, ResourceLocation top) {
-        doorBlockInternal(block, key(block).toString(), bottom, top);
+        doorBlockInternal(block, block.getRegistryName().toString(), bottom, top);
     }
 
     public void doorBlock(DoorBlock block, String name, ResourceLocation bottom, ResourceLocation top) {
         doorBlockInternal(block, name + "_door", bottom, top);
     }
 
-    public void doorBlockWithRenderType(DoorBlock block, ResourceLocation bottom, ResourceLocation top, String renderType) {
-        doorBlockInternalWithRenderType(block, key(block).toString(), bottom, top, ResourceLocation.tryParse(renderType));
-    }
-
-    public void doorBlockWithRenderType(DoorBlock block, String name, ResourceLocation bottom, ResourceLocation top, String renderType) {
-        doorBlockInternalWithRenderType(block, name + "_door", bottom, top, ResourceLocation.tryParse(renderType));
-    }
-
-    public void doorBlockWithRenderType(DoorBlock block, ResourceLocation bottom, ResourceLocation top, ResourceLocation renderType) {
-        doorBlockInternalWithRenderType(block, key(block).toString(), bottom, top, renderType);
-    }
-
-    public void doorBlockWithRenderType(DoorBlock block, String name, ResourceLocation bottom, ResourceLocation top, ResourceLocation renderType) {
-        doorBlockInternalWithRenderType(block, name + "_door", bottom, top, renderType);
-    }
-
     private void doorBlockInternal(DoorBlock block, String baseName, ResourceLocation bottom, ResourceLocation top) {
-        ModelFile bottomLeft = models().doorBottomLeft(baseName + "_bottom_left", bottom, top);
-        ModelFile bottomLeftOpen = models().doorBottomLeftOpen(baseName + "_bottom_left_open", bottom, top);
-        ModelFile bottomRight = models().doorBottomRight(baseName + "_bottom_right", bottom, top);
-        ModelFile bottomRightOpen = models().doorBottomRightOpen(baseName + "_bottom_right_open", bottom, top);
-        ModelFile topLeft = models().doorTopLeft(baseName + "_top_left", bottom, top);
-        ModelFile topLeftOpen = models().doorTopLeftOpen(baseName + "_top_left_open", bottom, top);
-        ModelFile topRight = models().doorTopRight(baseName + "_top_right", bottom, top);
-        ModelFile topRightOpen = models().doorTopRightOpen(baseName + "_top_right_open", bottom, top);
-        doorBlock(block, bottomLeft, bottomLeftOpen, bottomRight, bottomRightOpen, topLeft, topLeftOpen, topRight, topRightOpen);
+        ModelFile bottomLeft = models().doorBottomLeft(baseName + "_bottom", bottom, top);
+        ModelFile bottomRight = models().doorBottomRight(baseName + "_bottom_hinge", bottom, top);
+        ModelFile topLeft = models().doorTopLeft(baseName + "_top", bottom, top);
+        ModelFile topRight = models().doorTopRight(baseName + "_top_hinge", bottom, top);
+        doorBlock(block, bottomLeft, bottomRight, topLeft, topRight);
     }
 
-    private void doorBlockInternalWithRenderType(DoorBlock block, String baseName, ResourceLocation bottom, ResourceLocation top, ResourceLocation renderType) {
-        ModelFile bottomLeft = models().doorBottomLeft(baseName + "_bottom_left", bottom, top).renderType(renderType);
-        ModelFile bottomLeftOpen = models().doorBottomLeftOpen(baseName + "_bottom_left_open", bottom, top).renderType(renderType);
-        ModelFile bottomRight = models().doorBottomRight(baseName + "_bottom_right", bottom, top).renderType(renderType);
-        ModelFile bottomRightOpen = models().doorBottomRightOpen(baseName + "_bottom_right_open", bottom, top).renderType(renderType);
-        ModelFile topLeft = models().doorTopLeft(baseName + "_top_left", bottom, top).renderType(renderType);
-        ModelFile topLeftOpen = models().doorTopLeftOpen(baseName + "_top_left_open", bottom, top).renderType(renderType);
-        ModelFile topRight = models().doorTopRight(baseName + "_top_right", bottom, top).renderType(renderType);
-        ModelFile topRightOpen = models().doorTopRightOpen(baseName + "_top_right_open", bottom, top).renderType(renderType);
-        doorBlock(block, bottomLeft, bottomLeftOpen, bottomRight, bottomRightOpen, topLeft, topLeftOpen, topRight, topRightOpen);
-    }
-
-    public void doorBlock(DoorBlock block, ModelFile bottomLeft, ModelFile bottomLeftOpen, ModelFile bottomRight, ModelFile bottomRightOpen, ModelFile topLeft, ModelFile topLeftOpen, ModelFile topRight, ModelFile topRightOpen) {
+    public void doorBlock(DoorBlock block, ModelFile bottomLeft, ModelFile bottomRight, ModelFile topLeft, ModelFile topRight) {
         getVariantBuilder(block).forAllStatesExcept(state -> {
             int yRot = ((int) state.getValue(DoorBlock.FACING).toYRot()) + 90;
-            boolean right = state.getValue(DoorBlock.HINGE) == DoorHingeSide.RIGHT;
+            boolean rh = state.getValue(DoorBlock.HINGE) == DoorHingeSide.RIGHT;
             boolean open = state.getValue(DoorBlock.OPEN);
-            boolean lower = state.getValue(DoorBlock.HALF) == DoubleBlockHalf.LOWER;
+            boolean right = rh ^ open;
             if (open) {
                 yRot += 90;
             }
-            if (right && open) {
+            if (rh && open) {
                 yRot += 180;
             }
             yRot %= 360;
-
-            ModelFile model = null;
-            if (lower && right && open) {
-                model = bottomRightOpen;
-            } else if (lower && !right && open) {
-                model = bottomLeftOpen;
-            }
-            if (lower && right && !open) {
-                model = bottomRight;
-            } else if (lower && !right && !open) {
-                model = bottomLeft;
-            }
-            if (!lower && right && open) {
-                model = topRightOpen;
-            } else if (!lower && !right && open) {
-                model = topLeftOpen;
-            }
-            if (!lower && right && !open) {
-                model = topRight;
-            } else if (!lower && !right && !open) {
-                model = topLeft;
-            }
-
-            return ConfiguredModel.builder().modelFile(model)
-                .rotationY(yRot)
-                .build();
+            return ConfiguredModel.builder().modelFile(state.getValue(DoorBlock.HALF) == DoubleBlockHalf.LOWER ? (right ? bottomRight : bottomLeft) : (right ? topRight : topLeft))
+                    .rotationY(yRot)
+                    .build();
         }, DoorBlock.POWERED);
     }
 
     public void trapdoorBlock(TrapDoorBlock block, ResourceLocation texture, boolean orientable) {
-        trapdoorBlockInternal(block, key(block).toString(), texture, orientable);
+        trapdoorBlockInternal(block, block.getRegistryName().toString(), texture, orientable);
     }
 
     public void trapdoorBlock(TrapDoorBlock block, String name, ResourceLocation texture, boolean orientable) {
         trapdoorBlockInternal(block, name + "_trapdoor", texture, orientable);
     }
 
-    public void trapdoorBlockWithRenderType(TrapDoorBlock block, ResourceLocation texture, boolean orientable, String renderType) {
-        trapdoorBlockInternalWithRenderType(block, key(block).toString(), texture, orientable, ResourceLocation.tryParse(renderType));
-    }
-
-    public void trapdoorBlockWithRenderType(TrapDoorBlock block, String name, ResourceLocation texture, boolean orientable, String renderType) {
-        trapdoorBlockInternalWithRenderType(block, name + "_trapdoor", texture, orientable, ResourceLocation.tryParse(renderType));
-    }
-
-    public void trapdoorBlockWithRenderType(TrapDoorBlock block, ResourceLocation texture, boolean orientable, ResourceLocation renderType) {
-        trapdoorBlockInternalWithRenderType(block, key(block).toString(), texture, orientable, renderType);
-    }
-
-    public void trapdoorBlockWithRenderType(TrapDoorBlock block, String name, ResourceLocation texture, boolean orientable, ResourceLocation renderType) {
-        trapdoorBlockInternalWithRenderType(block, name + "_trapdoor", texture, orientable, renderType);
-    }
-
     private void trapdoorBlockInternal(TrapDoorBlock block, String baseName, ResourceLocation texture, boolean orientable) {
         ModelFile bottom = orientable ? models().trapdoorOrientableBottom(baseName + "_bottom", texture) : models().trapdoorBottom(baseName + "_bottom", texture);
         ModelFile top = orientable ? models().trapdoorOrientableTop(baseName + "_top", texture) : models().trapdoorTop(baseName + "_top", texture);
         ModelFile open = orientable ? models().trapdoorOrientableOpen(baseName + "_open", texture) : models().trapdoorOpen(baseName + "_open", texture);
-        trapdoorBlock(block, bottom, top, open, orientable);
-    }
-
-    private void trapdoorBlockInternalWithRenderType(TrapDoorBlock block, String baseName, ResourceLocation texture, boolean orientable, ResourceLocation renderType) {
-        ModelFile bottom = orientable ? models().trapdoorOrientableBottom(baseName + "_bottom", texture).renderType(renderType) : models().trapdoorBottom(baseName + "_bottom", texture).renderType(renderType);
-        ModelFile top = orientable ? models().trapdoorOrientableTop(baseName + "_top", texture).renderType(renderType) : models().trapdoorTop(baseName + "_top", texture).renderType(renderType);
-        ModelFile open = orientable ? models().trapdoorOrientableOpen(baseName + "_open", texture).renderType(renderType) : models().trapdoorOpen(baseName + "_open", texture).renderType(renderType);
         trapdoorBlock(block, bottom, top, open, orientable);
     }
 
@@ -865,14 +587,19 @@ public abstract class BlockStateProvider implements DataProvider {
         }, TrapDoorBlock.POWERED, TrapDoorBlock.WATERLOGGED);
     }
 
-    private CompletableFuture<?> saveBlockState(CachedOutput cache, JsonObject stateJson, Block owner) {
-        ResourceLocation blockName = Preconditions.checkNotNull(key(owner));
-        Path outputPath = this.output.getOutputFolder(PackOutput.Target.RESOURCE_PACK)
-                .resolve(blockName.getNamespace()).resolve("blockstates").resolve(blockName.getPath() + ".json");
-        return DataProvider.saveStable(cache, stateJson, outputPath);
+    private void saveBlockState(HashCache cache, JsonObject stateJson, Block owner) {
+        ResourceLocation blockName = Preconditions.checkNotNull(owner.getRegistryName());
+        Path mainOutput = generator.getOutputFolder();
+        String pathSuffix = "assets/" + blockName.getNamespace() + "/blockstates/" + blockName.getPath() + ".json";
+        Path outputPath = mainOutput.resolve(pathSuffix);
+        try {
+            DataProvider.save(GSON, cache, stateJson, outputPath);
+        } catch (IOException e) {
+            LOGGER.error("Couldn't save blockstate to {}", outputPath, e);
+        }
     }
 
-    @NotNull
+    @Nonnull
     @Override
     public String getName() {
         return "Block States: " + modid;

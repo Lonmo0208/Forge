@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Forge Development LLC and contributors
+ * Minecraft Forge - Forge Development LLC
  * SPDX-License-Identifier: LGPL-2.1-only
  */
 
@@ -10,7 +10,7 @@ import java.util.List;
 
 public class WorldWorkerManager
 {
-    private static final List<IWorker> workers = new ArrayList<>();
+    private static List<IWorker> workers = new ArrayList<IWorker>();
     private static long startTime = -1;
     private static int index = 0;
 

@@ -1,17 +1,15 @@
 /*
- * Copyright (c) Forge Development LLC and contributors
+ * Minecraft Forge - Forge Development LLC
  * SPDX-License-Identifier: LGPL-2.1-only
  */
 
 package net.minecraftforge.common.extensions;
 
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.SectionPos;
 import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.chunk.*;
-import net.minecraftforge.client.model.data.ModelDataManager;
 import org.jetbrains.annotations.Nullable;
 
 public interface IForgeBlockGetter
@@ -31,7 +29,7 @@ public interface IForgeBlockGetter
     {
         if (this instanceof Level level)
         {
-            if (!level.hasChunk(SectionPos.blockToSectionCoord(pos.getX()), SectionPos.blockToSectionCoord(pos.getZ())))
+            if (!level.hasChunk(pos.getX(), pos.getZ()))
             {
                 return null;
             }
@@ -47,15 +45,5 @@ public interface IForgeBlockGetter
             return chunk.getWrapped().getExistingBlockEntity(pos);
         }
         return self().getBlockEntity(pos);
-    }
-
-    /**
-     * Retrieves the model data manager for this level.
-     * This will be {@code null} on a server level.
-     */
-    @Nullable
-    default ModelDataManager getModelDataManager()
-    {
-        return null;
     }
 }

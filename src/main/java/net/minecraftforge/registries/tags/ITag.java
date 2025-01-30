@@ -1,12 +1,11 @@
 /*
- * Copyright (c) Forge Development LLC and contributors
+ * Minecraft Forge - Forge Development LLC
  * SPDX-License-Identifier: LGPL-2.1-only
  */
 
 package net.minecraftforge.registries.tags;
 
 import net.minecraft.tags.TagKey;
-import net.minecraft.util.RandomSource;
 
 import java.util.Optional;
 import java.util.Random;
@@ -32,7 +31,7 @@ public interface ITag<V> extends Iterable<V>
 
     boolean contains(V value);
 
-    Optional<V> getRandomElement(RandomSource random);
+    Optional<V> getRandomElement(Random random);
 
     /**
      * @return {@code true} if this tag was loaded with a value (including empty),

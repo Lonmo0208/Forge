@@ -1,14 +1,9 @@
-/*
- * Copyright (c) Forge Development LLC and contributors
- * SPDX-License-Identifier: LGPL-2.1-only
- */
-
 package net.minecraftforge.fml.loading;
 
-import com.mojang.logging.LogUtils;
 import cpw.mods.modlauncher.api.INameMappingService;
 import org.apache.commons.lang3.tuple.Pair;
-import org.slf4j.Logger;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -20,7 +15,7 @@ import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 
 public class MCPNamingService implements INameMappingService {
-    private static final Logger LOGGER = LogUtils.getLogger();
+    private static final Logger LOGGER = LogManager.getLogger();
     private HashMap<String, String> methods;
     private HashMap<String, String> fields;
 
@@ -36,7 +31,7 @@ public class MCPNamingService implements INameMappingService {
 
     @Override
     public Map.Entry<String, String> understanding() {
-        return Map.entry("srg", "mcp");
+        return Pair.of("srg", "mcp");
     }
 
     @Override
@@ -77,7 +72,7 @@ public class MCPNamingService implements INameMappingService {
     }
 
     private static void loadMappings(final String mappingFileName, BiConsumer<String, String> mapStore) {
-        URL path = MCPNamingService.class.getClassLoader().getResource(mappingFileName);
+        URL path = ClassLoader.getSystemResource(mappingFileName); //We EXPLICITLY go through the SystemClassLoader here because this is dev-time only. And will be on the root classpath.
         if (path == null)
             return;
 

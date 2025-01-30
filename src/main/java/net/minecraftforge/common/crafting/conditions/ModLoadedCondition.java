@@ -1,35 +1,64 @@
 /*
- * Copyright (c) Forge Development LLC and contributors
+ * Minecraft Forge - Forge Development LLC
  * SPDX-License-Identifier: LGPL-2.1-only
  */
 
 package net.minecraftforge.common.crafting.conditions;
 
-import com.mojang.serialization.Codec;
-import com.mojang.serialization.DynamicOps;
-import com.mojang.serialization.MapCodec;
-import com.mojang.serialization.codecs.RecordCodecBuilder;
+import com.google.gson.JsonObject;
 
+import net.minecraft.util.GsonHelper;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraftforge.fml.ModList;
 
-public record ModLoadedCondition(String modid) implements ICondition {
-    public static final MapCodec<ModLoadedCondition> CODEC = RecordCodecBuilder.mapCodec(b -> b.group(
-        Codec.STRING.fieldOf("modid").forGetter(ModLoadedCondition::modid)
-    ).apply(b, ModLoadedCondition::new));
+public class ModLoadedCondition implements ICondition
+{
+    private static final ResourceLocation NAME = new ResourceLocation("forge", "mod_loaded");
+    private final String modid;
+
+    public ModLoadedCondition(String modid)
+    {
+        this.modid = modid;
+    }
 
     @Override
-    public boolean test(IContext context, DynamicOps<?> ops) {
+    public ResourceLocation getID()
+    {
+        return NAME;
+    }
+
+    @Override
+    public boolean test()
+    {
         return ModList.get().isLoaded(modid);
     }
 
     @Override
-    public String toString() {
+    public String toString()
+    {
         return "mod_loaded(\"" + modid + "\")";
     }
 
-    @Override
-    public MapCodec<? extends ICondition> codec() {
-        return CODEC;
-    }
+    public static class Serializer implements IConditionSerializer<ModLoadedCondition>
+    {
+        public static final Serializer INSTANCE = new Serializer();
 
+        @Override
+        public void write(JsonObject json, ModLoadedCondition value)
+        {
+            json.addProperty("modid", value.modid);
+        }
+
+        @Override
+        public ModLoadedCondition read(JsonObject json)
+        {
+            return new ModLoadedCondition(GsonHelper.getAsString(json, "modid"));
+        }
+
+        @Override
+        public ResourceLocation getID()
+        {
+            return ModLoadedCondition.NAME;
+        }
+    }
 }

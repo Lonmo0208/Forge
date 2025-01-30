@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Forge Development LLC and contributors
+ * Minecraft Forge - Forge Development LLC
  * SPDX-License-Identifier: LGPL-2.1-only
  */
 
@@ -10,27 +10,31 @@ import net.minecraft.world.inventory.AnvilMenu;
 import net.minecraft.world.item.ItemStack;
 import net.minecraftforge.eventbus.api.Cancelable;
 import net.minecraftforge.eventbus.api.Event;
-import org.jetbrains.annotations.Nullable;
+
+import javax.annotation.Nullable;
 
 /**
- *
- * AnvilUpdateEvent is fired whenever the input stacks (left or right) or the name in an anvil changed. <br>
+ * 
+ * AnvilUpdateEvent is fired when the inputs (either input stack, or the name) to an anvil are changed. <br> 
  * It is called from {@link AnvilMenu#createResult()}. <br>
  * If the event is canceled, vanilla behavior will not run, and the output will be set to {@link ItemStack#EMPTY}. <br>
  * If the event is not canceled, but the output is not empty, it will set the output and not run vanilla behavior. <br>
  * if the output is empty, and the event is not canceled, vanilla behavior will execute. <br>
  */
 @Cancelable
-public class AnvilUpdateEvent extends Event {
+public class AnvilUpdateEvent extends Event
+{
+
     private final ItemStack left;
     private final ItemStack right;
     private final String name;
     private ItemStack output;
-    private long cost;
+    private int cost;
     private int materialCost;
     private final Player player;
 
-    public AnvilUpdateEvent(ItemStack left, ItemStack right, String name, long cost, Player player) {
+    public AnvilUpdateEvent(ItemStack left, ItemStack right, String name, int cost, Player player)
+    {
         this.left = left;
         this.right = right;
         this.output = ItemStack.EMPTY;
@@ -43,14 +47,16 @@ public class AnvilUpdateEvent extends Event {
     /**
      * @return The item in the left input (leftmost) anvil slot.
      */
-    public ItemStack getLeft() {
+    public ItemStack getLeft()
+    {
         return left;
     }
 
     /**
      * @return The item in the right input (center) anvil slot.
      */
-    public ItemStack getRight() {
+    public ItemStack getRight()
+    {
         return right;
     }
 
@@ -60,7 +66,8 @@ public class AnvilUpdateEvent extends Event {
      * @return The name that the output item will be set to, if applicable.
      */
     @Nullable
-    public String getName() {
+    public String getName()
+    {
         return name;
     }
 
@@ -71,7 +78,8 @@ public class AnvilUpdateEvent extends Event {
      * If this event is cancelled, this output stack is discarded.
      * @return The item to set in the output (rightmost) anvil slot.
      */
-    public ItemStack getOutput() {
+    public ItemStack getOutput() 
+    {
         return output;
     }
 
@@ -79,16 +87,18 @@ public class AnvilUpdateEvent extends Event {
      * Sets the output slot to a specific itemstack.
      * @param output The stack to change the output to.
      */
-    public void setOutput(ItemStack output) {
+    public void setOutput(ItemStack output)
+    {
         this.output = output;
     }
 
     /**
-     * This is the level cost of this anvil operation. <br>
+     * This is the level cost of this anvil operation. <br> 
      * When unchanged, it is guaranteed to be left.getRepairCost() + right.getRepairCost().
      * @return The level cost of this anvil operation.
      */
-    public long getCost() {
+    public int getCost()
+    {
         return cost;
     }
 
@@ -98,7 +108,8 @@ public class AnvilUpdateEvent extends Event {
      * That is, a player without enough experience may not take the output.
      * @param cost The new level cost.
      */
-    public void setCost(long cost) {
+    public void setCost(int cost)
+    {
         this.cost = cost;
     }
 
@@ -106,7 +117,8 @@ public class AnvilUpdateEvent extends Event {
      * The material cost is how many units of the right input stack are consumed.
      * @return The material cost of this anvil operation.
      */
-    public int getMaterialCost() {
+    public int getMaterialCost()
+    {
         return materialCost;
     }
 
@@ -118,14 +130,16 @@ public class AnvilUpdateEvent extends Event {
      * The material cost does not prevent the output from being available.
      * @param materialCost The new material cost.
      */
-    public void setMaterialCost(int materialCost) {
+    public void setMaterialCost(int materialCost)
+    {
         this.materialCost = materialCost;
     }
 
     /**
      * @return The player using this anvil container.
      */
-    public Player getPlayer() {
+    public Player getPlayer()
+    {
         return this.player;
     }
 }

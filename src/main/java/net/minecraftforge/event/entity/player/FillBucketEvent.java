@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Forge Development LLC and contributors
+ * Minecraft Forge - Forge Development LLC
  * SPDX-License-Identifier: LGPL-2.1-only
  */
 
@@ -11,8 +11,9 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.level.Level;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
+
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 
 /**
  * This event is fired when a player attempts to use a Empty bucket, it
@@ -29,26 +30,26 @@ public class FillBucketEvent extends PlayerEvent
 {
 
     private final ItemStack current;
-    private final Level level;
+    private final Level world;
     @Nullable
     private final HitResult target;
 
     private ItemStack result;
 
-    public FillBucketEvent(Player player, @NotNull ItemStack current, Level level, @Nullable HitResult target)
+    public FillBucketEvent(Player player, @Nonnull ItemStack current, Level world, @Nullable HitResult target)
     {
         super(player);
         this.current = current;
-        this.level = level;
+        this.world = world;
         this.target = target;
     }
 
-    @NotNull
+    @Nonnull
     public ItemStack getEmptyBucket() { return this.current; }
-    public Level getLevel(){ return this.level; }
+    public Level getWorld(){ return this.world; }
     @Nullable
     public HitResult getTarget() { return this.target; }
-    @NotNull
+    @Nonnull
     public ItemStack getFilledBucket() { return this.result; }
-    public void setFilledBucket(@NotNull ItemStack bucket) { this.result = bucket; }
+    public void setFilledBucket(@Nonnull ItemStack bucket) { this.result = bucket; }
 }

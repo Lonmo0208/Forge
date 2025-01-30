@@ -27,6 +27,6 @@ public class ObjectTarget implements Comparable<ObjectTarget> {
     
     @Override
     int compareTo(ObjectTarget o) {
-        return toString() <=> o.toString()
+        return toString().compareTo(o.toString())
     }
 }

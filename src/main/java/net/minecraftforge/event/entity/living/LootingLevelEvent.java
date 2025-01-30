@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Forge Development LLC and contributors
+ * Minecraft Forge - Forge Development LLC
  * SPDX-License-Identifier: LGPL-2.1-only
  */
 
@@ -7,8 +7,9 @@ package net.minecraftforge.event.entity.living;
 
 import net.minecraft.world.entity.LivingEntity;
 
+import javax.annotation.Nullable;
+
 import net.minecraft.world.damagesource.DamageSource;
-import org.jetbrains.annotations.Nullable;
 
 public class LootingLevelEvent extends LivingEvent {
 

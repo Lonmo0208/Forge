@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Forge Development LLC and contributors
+ * Minecraft Forge - Forge Development LLC
  * SPDX-License-Identifier: LGPL-2.1-only
  */
 
@@ -8,30 +8,23 @@ package net.minecraftforge.client.model.obj;
 import com.google.common.collect.Maps;
 import com.google.gson.JsonDeserializationContext;
 import com.google.gson.JsonObject;
-import com.google.gson.JsonParseException;
 import net.minecraft.client.Minecraft;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.packs.resources.Resource;
 import net.minecraft.server.packs.resources.ResourceManager;
-import net.minecraft.server.packs.resources.ResourceManagerReloadListener;
 import net.minecraft.util.GsonHelper;
-import net.minecraftforge.client.model.geometry.IGeometryLoader;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraftforge.client.model.IModelLoader;
 
+import javax.annotation.Nullable;
 import java.io.FileNotFoundException;
-import java.util.Map;
+import java.util.*;
 
-/**
- * A loader for {@link ObjModel OBJ models}.
- * <p>
- * Allows the user to enable automatic face culling, toggle quad shading, flip UVs, render emissively and specify a
- * {@link ObjMaterialLibrary material library} override.
- */
-public class ObjLoader implements IGeometryLoader<ObjModel>, ResourceManagerReloadListener
+public class OBJLoader implements IModelLoader<OBJModel>
 {
-    public static ObjLoader INSTANCE = new ObjLoader();
+    public static OBJLoader INSTANCE = new OBJLoader();
 
-    private final Map<ObjModel.ModelSettings, ObjModel> modelCache = Maps.newConcurrentMap();
-    private final Map<ResourceLocation, ObjMaterialLibrary> materialCache = Maps.newConcurrentMap();
+    private final Map<OBJModel.ModelSettings, OBJModel> modelCache = Maps.newHashMap();
+    private final Map<ResourceLocation, MaterialLibrary> materialCache = Maps.newHashMap();
 
     private ResourceManager manager = Minecraft.getInstance().getResourceManager();
 
@@ -44,50 +37,56 @@ public class ObjLoader implements IGeometryLoader<ObjModel>, ResourceManagerRelo
     }
 
     @Override
-    public ObjModel read(JsonObject jsonObject, JsonDeserializationContext deserializationContext)
+    public OBJModel read(JsonDeserializationContext deserializationContext, JsonObject modelContents)
     {
-        if (!jsonObject.has("model"))
-            throw new JsonParseException("OBJ Loader requires a 'model' key that points to a valid .OBJ model.");
+        if (!modelContents.has("model"))
+            throw new RuntimeException("OBJ Loader requires a 'model' key that points to a valid .OBJ model.");
 
-        String modelLocation = jsonObject.get("model").getAsString();
+        String modelLocation = modelContents.get("model").getAsString();
 
-        boolean automaticCulling = GsonHelper.getAsBoolean(jsonObject, "automatic_culling", true);
-        boolean shadeQuads = GsonHelper.getAsBoolean(jsonObject, "shade_quads", true);
-        boolean flipV = GsonHelper.getAsBoolean(jsonObject, "flip_v", false);
-        boolean emissiveAmbient = GsonHelper.getAsBoolean(jsonObject, "emissive_ambient", true);
-        String mtlOverride = GsonHelper.getAsString(jsonObject, "mtl_override", null);
+        boolean detectCullableFaces = GsonHelper.getAsBoolean(modelContents, "detectCullableFaces", true);
+        boolean diffuseLighting = GsonHelper.getAsBoolean(modelContents, "diffuseLighting", false);
+        boolean flipV = GsonHelper.getAsBoolean(modelContents, "flip-v", false);
+        boolean ambientToFullbright = GsonHelper.getAsBoolean(modelContents, "ambientToFullbright", true);
+        @Nullable
+        String materialLibraryOverrideLocation = modelContents.has("materialLibraryOverride") ? GsonHelper.getAsString(modelContents, "materialLibraryOverride") : null;
 
-        return loadModel(new ObjModel.ModelSettings(ResourceLocation.parse(modelLocation), automaticCulling, shadeQuads, flipV, emissiveAmbient, mtlOverride));
+        return loadModel(new OBJModel.ModelSettings(new ResourceLocation(modelLocation), detectCullableFaces, diffuseLighting, flipV, ambientToFullbright, materialLibraryOverrideLocation));
     }
 
-    public ObjModel loadModel(ObjModel.ModelSettings settings)
+    public OBJModel loadModel(OBJModel.ModelSettings settings)
     {
         return modelCache.computeIfAbsent(settings, (data) -> {
-            Resource resource = manager.getResource(settings.modelLocation()).orElseThrow();
-            try (ObjTokenizer tokenizer = new ObjTokenizer(resource.open()))
+
+            try(Resource resource = manager.getResource(settings.modelLocation());
+                LineReader rdr = new LineReader(resource))
             {
-                return ObjModel.parse(tokenizer, settings);
-            } catch (FileNotFoundException e)
+                return new OBJModel(rdr, settings);
+            }
+            catch (FileNotFoundException e)
             {
                 throw new RuntimeException("Could not find OBJ model", e);
-            } catch (Exception e)
+            }
+            catch (Exception e)
             {
                 throw new RuntimeException("Could not read OBJ model", e);
             }
         });
     }
 
-    public ObjMaterialLibrary loadMaterialLibrary(ResourceLocation materialLocation)
+    public MaterialLibrary loadMaterialLibrary(ResourceLocation materialLocation)
     {
         return materialCache.computeIfAbsent(materialLocation, (location) -> {
-            Resource resource = manager.getResource(location).orElseThrow();
-            try (ObjTokenizer rdr = new ObjTokenizer(resource.open()))
+            try(Resource resource = manager.getResource(location);
+                LineReader rdr = new LineReader(resource))
             {
-                return new ObjMaterialLibrary(rdr);
-            } catch (FileNotFoundException e)
+                return new MaterialLibrary(rdr);
+            }
+            catch (FileNotFoundException e)
             {
                 throw new RuntimeException("Could not find OBJ material library", e);
-            } catch (Exception e)
+            }
+            catch (Exception e)
             {
                 throw new RuntimeException("Could not read OBJ material library", e);
             }

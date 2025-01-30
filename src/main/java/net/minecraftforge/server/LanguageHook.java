@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Forge Development LLC and contributors
+ * Minecraft Forge - Forge Development LLC
  * SPDX-License-Identifier: LGPL-2.1-only
  */
 
@@ -18,41 +18,39 @@ import org.apache.commons.io.IOUtils;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-import java.io.IOException;
+import java.io.FileNotFoundException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.regex.Pattern;
 
-public class LanguageHook {
+public class LanguageHook
+{
     private static final Logger LOGGER = LogManager.getLogger();
     private static final Gson GSON = new Gson();
     private static final Pattern PATTERN = Pattern.compile("%(\\d+\\$)?[\\d\\.]*[df]");
-    private static final List<Map<String, String>> CAPTURED_TABLES = new ArrayList<>();
+    private static List<Map<String, String>> capturedTables = new ArrayList<>(2);
     private static Map<String, String> modTable;
     /**
      * Loads lang files on the server
      */
-    public static void captureLanguageMap(Map<String, String> table) {
-        CAPTURED_TABLES.add(table);
-        if (modTable != null)
-            CAPTURED_TABLES.forEach(t -> t.putAll(modTable));
+    public static void captureLanguageMap(Map<String, String> table)
+    {
+        capturedTables.add(table);
+        if (modTable != null) {
+            capturedTables.forEach(t->t.putAll(modTable));
+        }
     }
 
     // The below is based on client side net.minecraft.client.resources.Locale code
     private static void loadLocaleData(final List<Resource> allResources) {
-        for (var res : allResources) {
-            try (var stream = res.open()) {
-                LanguageHook.loadLocaleData(stream);
-            } catch(IOException e) {
-                LOGGER.error("Failed to read locale data from {}", res.toString(), e);
-            }
-        }
+        allResources.stream().map(Resource::getInputStream).forEach(LanguageHook::loadLocaleData);
     }
 
     private static void loadLocaleData(final InputStream inputstream) {
-        try {
+        try
+        {
             JsonElement jsonelement = GSON.fromJson(new InputStreamReader(inputstream, StandardCharsets.UTF_8), JsonElement.class);
             JsonObject jsonobject = GsonHelper.convertToJsonObject(jsonelement, "strings");
 
@@ -60,7 +58,9 @@ public class LanguageHook {
                 String s = PATTERN.matcher(GsonHelper.convertToString(entry.getValue(), entry.getKey())).replaceAll("%$1s");
                 modTable.put(entry.getKey(), s);
             });
-        } finally {
+        }
+        finally
+        {
             IOUtils.closeQuietly(inputstream);
         }
     }
@@ -70,8 +70,9 @@ public class LanguageHook {
         ResourceManager resourceManager = server.getServerResources().resourceManager();
         resourceManager.getNamespaces().forEach(namespace -> {
             try {
-                ResourceLocation langResource = ResourceLocation.fromNamespaceAndPath(namespace, langFile);
-                loadLocaleData(resourceManager.getResourceStack(langResource));
+                ResourceLocation langResource = new ResourceLocation(namespace, langFile);
+                loadLocaleData(resourceManager.getResources(langResource));
+            } catch (FileNotFoundException fnfe) {
             } catch (Exception exception) {
                 LOGGER.warn("Skipped language file: {}:{}", namespace, langFile, exception);
             }
@@ -85,14 +86,17 @@ public class LanguageHook {
         final InputStream forge = Thread.currentThread().getContextClassLoader().getResourceAsStream("assets/forge/lang/en_us.json");
         loadLocaleData(mc);
         loadLocaleData(forge);
-        CAPTURED_TABLES.forEach(t -> t.putAll(modTable));
+        capturedTables.forEach(t->t.putAll(modTable));
         ForgeI18n.loadLanguageData(modTable);
     }
 
     static void loadLanguagesOnServer(MinecraftServer server) {
         modTable = new HashMap<>(5000);
-        loadLanguage("en_us", server);
-        CAPTURED_TABLES.forEach(t->t.putAll(modTable));
+        // Possible multi-language server support?
+        for (String lang : Arrays.asList("en_us")) {
+            loadLanguage(lang, server);
+        }
+        capturedTables.forEach(t->t.putAll(modTable));
         ForgeI18n.loadLanguageData(modTable);
     }
 }

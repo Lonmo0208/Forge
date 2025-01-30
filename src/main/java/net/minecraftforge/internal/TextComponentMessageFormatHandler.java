@@ -1,20 +1,19 @@
 /*
- * Copyright (c) Forge Development LLC and contributors
+ * Minecraft Forge - Forge Development LLC
  * SPDX-License-Identifier: LGPL-2.1-only
  */
 
 package net.minecraftforge.internal;
 
-import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.FormattedText;
-import net.minecraft.network.chat.MutableComponent;
-import net.minecraft.network.chat.contents.TranslatableContents;
+import net.minecraft.network.chat.TextComponent;
+import net.minecraft.network.chat.TranslatableComponent;
 import net.minecraftforge.common.ForgeI18n;
 
 import java.util.function.Consumer;
 
-public final class TextComponentMessageFormatHandler {
-    public static int handle(final TranslatableContents parent, final Consumer<FormattedText> addChild, final Object[] formatArgs, final String format) {
+public class TextComponentMessageFormatHandler {
+    public static int handle(final TranslatableComponent parent, final Consumer<FormattedText> addChild, final Object[] formatArgs, final String format) {
         try {
             final String formattedString = ForgeI18n.parseFormat(format, formatArgs);
 
@@ -28,7 +27,8 @@ public final class TextComponentMessageFormatHandler {
                 }
             }
 
-            MutableComponent component = Component.literal(formattedString);
+            TextComponent component = new TextComponent(formattedString);
+            component.getStyle().applyTo(parent.getStyle());
             addChild.accept(component);
             return format.length();
         } catch (IllegalArgumentException ex) {

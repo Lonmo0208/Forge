@@ -1,6 +1,20 @@
 /*
- * Copyright (c) Forge Development LLC and contributors
- * SPDX-License-Identifier: LGPL-2.1-only
+ * Minecraft Forge
+ * Copyright (c) 2016-2021.
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation version 2.1
+ * of the License.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
 package net.minecraftforge.fml;
@@ -11,11 +25,9 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
-import java.util.function.Function;
 import java.util.function.Supplier;
 
 import com.google.common.base.Stopwatch;
@@ -55,31 +67,17 @@ public class DeferredWorkQueue
     public void runTasks() {
         if (tasks.isEmpty()) return;
         LOGGER.debug(LOADING, "Dispatching synchronous work for work queue {}: {} jobs", modLoadingStage, tasks.size());
-        RuntimeException aggregate = new RuntimeException();
         Stopwatch timer = Stopwatch.createStarted();
-        for (TaskInfo t : tasks) {
-            makeRunnable(t, Runnable::run, aggregate);
-        }
+        tasks.forEach(t->makeRunnable(t, Runnable::run));
         timer.stop();
-        if (aggregate.getSuppressed().length > 0) {
-            LOGGER.fatal(
-                    LOADING,
-                    "Synchronous work queue completed exceptionally in {}, see suppressed exceptions for details:",
-                    timer,
-                    aggregate
-            );
-            throw aggregate;
-        } else {
-            LOGGER.debug(LOADING, "Synchronous work queue completed in {}", timer);
-        }
+        LOGGER.debug(LOADING, "Synchronous work queue completed in {}", timer);
     }
 
-    private static void makeRunnable(TaskInfo ti, Executor executor, RuntimeException aggregate) {
+    private static void makeRunnable(TaskInfo ti, Executor executor) {
         executor.execute(() -> {
             Stopwatch timer = Stopwatch.createStarted();
             ModLoadingContext.get().setActiveContainer(ti.owner);
             try {
-                ti.future.exceptionally(t -> captureException(ti.owner.getModId(), aggregate, t));
                 ti.task.run();
             } finally {
                 ModLoadingContext.get().setActiveContainer(null);
@@ -91,38 +89,13 @@ public class DeferredWorkQueue
         });
     }
 
-    private static <T> T captureException(String modId, RuntimeException aggregate, Throwable throwable) {
-        if (throwable instanceof CompletionException ce) {
-            throwable = ce.getCause();
-        }
-        aggregate.addSuppressed(throwable);
-        LOGGER.error("Mod '{}' encountered an error in a deferred task:", modId, throwable);
-        return null;
-    }
-
     public CompletableFuture<Void> enqueueWork(final ModContainer modInfo, final Runnable work) {
-        return enqueueWork(modInfo, taskInfo -> CompletableFuture.runAsync(work, r -> taskInfo.task = r));
+        return CompletableFuture.runAsync(work, r->tasks.add(new TaskInfo(modInfo, r)));
     }
 
     public <T> CompletableFuture<T> enqueueWork(final ModContainer modInfo, final Supplier<T> work) {
-        return enqueueWork(modInfo, taskInfo -> CompletableFuture.supplyAsync(work, r -> taskInfo.task = r));
+        return CompletableFuture.supplyAsync(work, r->tasks.add(new TaskInfo(modInfo, r)));
     }
 
-    private <T> CompletableFuture<T> enqueueWork(final ModContainer modInfo, Function<TaskInfo, CompletableFuture<T>> futureGen) {
-        TaskInfo taskInfo = new TaskInfo(modInfo);
-        CompletableFuture<T> future = futureGen.apply(taskInfo);
-        taskInfo.future = future;
-        tasks.add(taskInfo);
-        return future;
-    }
-
-    private static final class TaskInfo {
-        private final ModContainer owner;
-        private Runnable task;
-        private CompletableFuture<?> future;
-
-        private TaskInfo(ModContainer owner) {
-            this.owner = owner;
-        }
-    }
+    record TaskInfo(ModContainer owner, Runnable task) {}
 }

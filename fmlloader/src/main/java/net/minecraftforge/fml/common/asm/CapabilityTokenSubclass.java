@@ -1,6 +1,20 @@
 /*
- * Copyright (c) Forge Development LLC and contributors
- * SPDX-License-Identifier: LGPL-2.1-only
+ * Minecraft Forge
+ * Copyright (c) 2016-2021.
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation version 2.1
+ * of the License.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
 package net.minecraftforge.fml.common.asm;
@@ -36,9 +50,9 @@ import cpw.mods.modlauncher.serviceapi.ILaunchPluginService;
  */
 public class CapabilityTokenSubclass implements ILaunchPluginService {
 
-    private static final String FUNC_NAME = "getType";
-    private static final String FUNC_DESC = "()Ljava/lang/String;";
-    private static final String CAP_INJECT = "net/minecraftforge/common/capabilities/CapabilityToken"; //Don't directly reference this to prevent class loading.
+    private final String FUNC_NAME = "getType";
+    private final String FUNC_DESC = "()Ljava/lang/String;";
+    private final String CAP_INJECT = "net/minecraftforge/common/capabilities/CapabilityToken"; //Don't directly reference this to prevent class loading.
 
     @Override
     public String name() {
@@ -49,45 +63,49 @@ public class CapabilityTokenSubclass implements ILaunchPluginService {
     private static final EnumSet<Phase> NAY = EnumSet.noneOf(Phase.class);
 
     @Override
-    public EnumSet<Phase> handlesClass(Type classType, boolean isEmpty) {
-        if (isEmpty)
-            return NAY;
-
-        String internalName = classType.getInternalName();
-        if (internalName.startsWith("net/minecraft/") || internalName.startsWith("com/mojang/"))
-            return NAY;
-        
-        return YAY;
+    public EnumSet<Phase> handlesClass(Type classType, boolean isEmpty)
+    {
+        return isEmpty ? NAY : YAY;
     }
 
     @Override
-    public int processClassWithFlags(final Phase phase, final ClassNode classNode, final Type classType, final String reason) {
-        if (CAP_INJECT.equals(classNode.name)) {
-            for (MethodNode mtd : classNode.methods) {
-                if (FUNC_NAME.equals(mtd.name) && FUNC_DESC.equals(mtd.desc)) {
+    public int processClassWithFlags(final Phase phase, final ClassNode classNode, final Type classType, final String reason)
+    {
+        if (CAP_INJECT.equals(classNode.name))
+        {
+            for (MethodNode mtd : classNode.methods)
+            {
+                if (FUNC_NAME.equals(mtd.name) && FUNC_DESC.equals(mtd.desc))
+                {
                     mtd.access &= ~Opcodes.ACC_FINAL; // We have it final in code so people don't override it, cuz that'd be stupid, and make our transformer more complicated.
                 }
             }
             return ComputeFlags.SIMPLE_REWRITE;
-        } else if (CAP_INJECT.equals(classNode.superName)) {
+        }
+        else if (CAP_INJECT.equals(classNode.superName))
+        {
             Holder cls = new Holder();
 
             SignatureReader reader = new SignatureReader(classNode.signature); // Having a node version of this would probably be useful.
-            reader.accept(new SignatureVisitor(Opcodes.ASM9) {
-                final Deque<String> stack = new ArrayDeque<>();
+            reader.accept(new SignatureVisitor(Opcodes.ASM9)
+            {
+                Deque<String> stack = new ArrayDeque<>();
 
                 @Override
-                public void visitClassType(final String name) {
+                public void visitClassType(final String name)
+                {
                     stack.push(name);
                 }
 
                 @Override
-                public void visitInnerClassType(final String name) {
+                public void visitInnerClassType(final String name)
+                {
                     stack.push(stack.pop() + '$' + name);
                 }
 
                 @Override
-                public void visitEnd() {
+                public void visitEnd()
+                {
                     var val = stack.pop();
                     if (!stack.isEmpty() && CAP_INJECT.equals(stack.peek()))
                         cls.value = val;
@@ -102,12 +120,15 @@ public class CapabilityTokenSubclass implements ILaunchPluginService {
             mtd.visitInsn(Opcodes.ARETURN);
             mtd.visitEnd();
             return ComputeFlags.COMPUTE_MAXS;
-        } else {
+        }
+        else
+        {
             return ComputeFlags.NO_REWRITE;
         }
     }
 
-    private static final class Holder {
+    private static class Holder {
         String value;
     }
+
 }

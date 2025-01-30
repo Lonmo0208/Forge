@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Forge Development LLC and contributors
+ * Minecraft Forge - Forge Development LLC
  * SPDX-License-Identifier: LGPL-2.1-only
  */
 
@@ -9,32 +9,31 @@ import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraftforge.event.entity.EntityEvent;
 
 /**
- * Base class for all {@link ItemEntity} events. Contains a reference to the
- * ItemEntity of interest. For most ItemEntity events, there's little to no
+ * Base class for all EntityItem events. Contains a reference to the
+ * EntityItem of interest. For most EntityItem events, there's little to no
  * additional useful data from the firing method that isn't already contained
- * within the ItemEntity instance.
+ * within the EntityItem instance.
  */
 public class ItemEvent extends EntityEvent
 {
-    private final ItemEntity itemEntity;
+    private final ItemEntity entityItem;
 
     /**
-     * Creates a new event for an {@link ItemEntity}.
-     *
-     * @param itemEntity The ItemEntity for this event
+     * Creates a new event for an EntityItem.
+     * 
+     * @param itemEntity The EntityItem for this event
      */
     public ItemEvent(ItemEntity itemEntity)
     {
         super(itemEntity);
-        this.itemEntity = itemEntity;
+        this.entityItem = itemEntity;
     }
 
     /**
-     * The relevant {@link ItemEntity} for this event.
+     * The relevant EntityItem for this event, already cast for you.
      */
-    @Override
-    public ItemEntity getEntity()
+    public ItemEntity getEntityItem()
     {
-        return itemEntity;
+        return entityItem;
     }
 }

@@ -1,32 +1,30 @@
 /*
- * Copyright (c) Forge Development LLC and contributors
+ * Minecraft Forge - Forge Development LLC
  * SPDX-License-Identifier: LGPL-2.1-only
  */
 
 package net.minecraftforge.client.model.generators;
 
-import com.google.common.base.Preconditions;
+import java.io.IOException;
 import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.CompletableFuture;
 import java.util.function.BiFunction;
 import java.util.function.Function;
-import net.minecraft.data.CachedOutput;
+
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+
+import net.minecraft.data.DataGenerator;
+import net.minecraft.data.HashCache;
 import net.minecraft.data.DataProvider;
-import net.minecraft.data.PackOutput;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.packs.PackType;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraftforge.common.data.ExistingFileHelper;
 import net.minecraftforge.common.data.ExistingFileHelper.ResourceType;
-import org.jetbrains.annotations.VisibleForTesting;
 
-/**
- * In 1.21.4 Mojang exposed their data generators for their models. So it should be feasible to just use theirs.
- * If you find something lacking feel free to open a PR so that we can extend it.
- * @deprecated Use Vanilla's providers {@link net.minecraft.client.data.models.ModelProvider}
- */
-@Deprecated(since = "1.21.4", forRemoval = true)
 public abstract class ModelProvider<T extends ModelBuilder<T>> implements DataProvider {
 
     public static final String BLOCK_FOLDER = "block";
@@ -36,7 +34,8 @@ public abstract class ModelProvider<T extends ModelBuilder<T>> implements DataPr
     protected static final ResourceType MODEL = new ResourceType(PackType.CLIENT_RESOURCES, ".json", "models");
     protected static final ResourceType MODEL_WITH_EXTENSION = new ResourceType(PackType.CLIENT_RESOURCES, "", "models");
 
-    protected final PackOutput output;
+    private static final Gson GSON = (new GsonBuilder()).setPrettyPrinting().create();
+    protected final DataGenerator generator;
     protected final String modid;
     protected final String folder;
     protected final Function<ResourceLocation, T> factory;
@@ -47,9 +46,9 @@ public abstract class ModelProvider<T extends ModelBuilder<T>> implements DataPr
 
     protected abstract void registerModels();
 
-    public ModelProvider(PackOutput output, String modid, String folder, Function<ResourceLocation, T> factory, ExistingFileHelper existingFileHelper) {
-        Preconditions.checkNotNull(output);
-        this.output = output;
+    public ModelProvider(DataGenerator generator, String modid, String folder, Function<ResourceLocation, T> factory, ExistingFileHelper existingFileHelper) {
+        Preconditions.checkNotNull(generator);
+        this.generator = generator;
         Preconditions.checkNotNull(modid);
         this.modid = modid;
         Preconditions.checkNotNull(folder);
@@ -60,13 +59,13 @@ public abstract class ModelProvider<T extends ModelBuilder<T>> implements DataPr
         this.existingFileHelper = existingFileHelper;
     }
 
-    public ModelProvider(PackOutput output, String modid, String folder, BiFunction<ResourceLocation, ExistingFileHelper, T> builderFromModId, ExistingFileHelper existingFileHelper) {
-        this(output, modid, folder, loc->builderFromModId.apply(loc, existingFileHelper), existingFileHelper);
+    public ModelProvider(DataGenerator generator, String modid, String folder, BiFunction<ResourceLocation, ExistingFileHelper, T> builderFromModId, ExistingFileHelper existingFileHelper) {
+        this(generator, modid, folder, loc->builderFromModId.apply(loc, existingFileHelper), existingFileHelper);
     }
 
     public T getBuilder(String path) {
         Preconditions.checkNotNull(path, "Path must not be null");
-        ResourceLocation outputLoc = extendWithFolder(path.contains(":") ? ResourceLocation.parse(path) : ResourceLocation.fromNamespaceAndPath(modid, path));
+        ResourceLocation outputLoc = extendWithFolder(path.contains(":") ? new ResourceLocation(path) : new ResourceLocation(modid, path));
         this.existingFileHelper.trackGenerated(outputLoc, MODEL);
         return generatedModels.computeIfAbsent(outputLoc, factory);
     }
@@ -75,15 +74,15 @@ public abstract class ModelProvider<T extends ModelBuilder<T>> implements DataPr
         if (rl.getPath().contains("/")) {
             return rl;
         }
-        return rl.withPrefix(folder + '/');
+        return new ResourceLocation(rl.getNamespace(), folder + "/" + rl.getPath());
     }
 
     public ResourceLocation modLoc(String name) {
-        return ResourceLocation.fromNamespaceAndPath(modid, name);
+        return new ResourceLocation(modid, name);
     }
 
     public ResourceLocation mcLoc(String name) {
-        return ResourceLocation.parse(name);
+        return new ResourceLocation(name);
     }
 
     public T withExistingParent(String name, String parent) {
@@ -262,7 +261,7 @@ public abstract class ModelProvider<T extends ModelBuilder<T>> implements DataPr
     public T wallSide(String name, ResourceLocation wall) {
         return singleTexture(name, BLOCK_FOLDER + "/template_wall_side", "wall", wall);
     }
-
+    
     public T wallSideTall(String name, ResourceLocation wall) {
         return singleTexture(name, BLOCK_FOLDER + "/template_wall_side_tall", "wall", wall);
     }
@@ -304,35 +303,19 @@ public abstract class ModelProvider<T extends ModelBuilder<T>> implements DataPr
     }
 
     public T doorBottomLeft(String name, ResourceLocation bottom, ResourceLocation top) {
-        return door(name, "door_bottom_left", bottom, top);
-    }
-
-    public T doorBottomLeftOpen(String name, ResourceLocation bottom, ResourceLocation top) {
-        return door(name, "door_bottom_left_open", bottom, top);
+        return door(name, "door_bottom", bottom, top);
     }
 
     public T doorBottomRight(String name, ResourceLocation bottom, ResourceLocation top) {
-        return door(name, "door_bottom_right", bottom, top);
-    }
-
-    public T doorBottomRightOpen(String name, ResourceLocation bottom, ResourceLocation top) {
-        return door(name, "door_bottom_right_open", bottom, top);
+        return door(name, "door_bottom_rh", bottom, top);
     }
 
     public T doorTopLeft(String name, ResourceLocation bottom, ResourceLocation top) {
-        return door(name, "door_top_left", bottom, top);
-    }
-
-    public T doorTopLeftOpen(String name, ResourceLocation bottom, ResourceLocation top) {
-        return door(name, "door_top_left_open", bottom, top);
+        return door(name, "door_top", bottom, top);
     }
 
     public T doorTopRight(String name, ResourceLocation bottom, ResourceLocation top) {
-        return door(name, "door_top_right", bottom, top);
-    }
-
-    public T doorTopRightOpen(String name, ResourceLocation bottom, ResourceLocation top) {
-        return door(name, "door_top_right_open", bottom, top);
+        return door(name, "door_top_rh", bottom, top);
     }
 
     public T trapdoorBottom(String name, ResourceLocation texture) {
@@ -371,15 +354,12 @@ public abstract class ModelProvider<T extends ModelBuilder<T>> implements DataPr
         return singleTexture(name, BLOCK_FOLDER + "/carpet", "wool", wool);
     }
 
-    public T leaves(String name, ResourceLocation texture) {
-        return singleTexture(name, BLOCK_FOLDER + "/leaves", "all", texture);
-    }
-
     /**
-     * {@return a model builder that's not directly saved to disk. Meant for use in custom model loaders.}
+     * Gets a model builder that's not directly saved to disk. Meant for use in custom model loaders.
      */
-    public T nested() {
-        return factory.apply(ResourceLocation.fromNamespaceAndPath("dummy",  "dummy"));
+    public T nested()
+    {
+        return factory.apply(new ResourceLocation("dummy:dummy"));
     }
 
     public ModelFile.ExistingModelFile getExistingFile(ResourceLocation path) {
@@ -387,32 +367,31 @@ public abstract class ModelProvider<T extends ModelBuilder<T>> implements DataPr
         ret.assertExistence();
         return ret;
     }
-
+    
     protected void clear() {
         generatedModels.clear();
     }
 
     @Override
-    public CompletableFuture<?> run(CachedOutput cache) {
+    public void run(HashCache cache) throws IOException {
         clear();
         registerModels();
-        return generateAll(cache);
+        generateAll(cache);
     }
 
-    protected CompletableFuture<?> generateAll(CachedOutput cache) {
-        CompletableFuture<?>[] futures = new CompletableFuture<?>[this.generatedModels.size()];
-        int i = 0;
-
-        for (T model : this.generatedModels.values()) {
+    protected void generateAll(HashCache cache) {
+        for (T model : generatedModels.values()) {
             Path target = getPath(model);
-            futures[i++] = DataProvider.saveStable(cache, model.toJson(), target);
+            try {
+                DataProvider.save(GSON, cache, model.toJson(), target);
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
         }
-
-        return CompletableFuture.allOf(futures);
     }
 
-    protected Path getPath(T model) {
+    private Path getPath(T model) {
         ResourceLocation loc = model.getLocation();
-        return this.output.getOutputFolder(PackOutput.Target.RESOURCE_PACK).resolve(loc.getNamespace()).resolve("models").resolve(loc.getPath() + ".json");
+        return generator.getOutputFolder().resolve("assets/" + loc.getNamespace() + "/models/" + loc.getPath() + ".json");
     }
 }

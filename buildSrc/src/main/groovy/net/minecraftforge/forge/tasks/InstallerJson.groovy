@@ -7,13 +7,13 @@ import org.gradle.api.file.RegularFileProperty
 import org.gradle.api.provider.Property
 import org.gradle.api.provider.SetProperty
 import org.gradle.api.tasks.*
-import org.gradle.api.tasks.bundling.AbstractArchiveTask
 
 import java.nio.file.Files
 
 abstract class InstallerJson extends DefaultTask {
     @OutputFile abstract RegularFileProperty getOutput()
     @InputFiles abstract ConfigurableFileCollection getInput()
+    @Input @Optional abstract SetProperty<String> getPackedDependencies()
     @Input @Optional final Map<String, Object> libraries = new LinkedHashMap<>()
     @Input Map<String, Object> json = new LinkedHashMap<>()
     @InputFile abstract RegularFileProperty getIcon()
@@ -23,19 +23,29 @@ abstract class InstallerJson extends DefaultTask {
     @Input abstract Property<String> getWelcome()
 
     InstallerJson() {
-        launcherJsonName.convention('/version.json')
-        logo.convention('/big_logo.png')
-        mirrors.convention('https://files.minecraftforge.net/mirrors-2.0.json')
-        welcome.convention("Welcome to the ${project.name.capitalize()} installer.")
-        output.convention(project.layout.buildDirectory.file('libs/install_profile.json'))
+        getLauncherJsonName().convention('/version.json')
+        getLogo().convention('/big_logo.png')
+        getMirrors().convention('https://files.minecraftforge.net/mirrors-2.0.json')
+        getWelcome().convention("Welcome to the simple ${project.name.capitalize()} installer.")
+                
+        getOutput().convention(project.layout.buildDirectory.file('install_profile.json'))
+
+        ['client', 'server'].each { side ->
+            ['slim', 'extra'].each { type ->
+                def tsk = project.tasks.getByName("download${side.capitalize()}${type.capitalize()}")
+                dependsOn(tsk)
+                input.from(tsk.output)
+            }
+            def tsk = project.tasks.getByName("create${side.capitalize()}SRG")
+            dependsOn(tsk)
+            input.from(tsk.output)
+        }
+
         
         project.afterEvaluate {
-            [
-                project.tasks.universalJar,
-                project.tasks.serverShimJar
-            ].forEach { packed ->
-                dependsOn(packed)
-                input.from packed.archiveFile
+            (packedDependencies.get().collect{ project.rootProject.tasks.findByPath(it) } + [project.universalJar]).forEach {
+                dependsOn(it)
+                input.from it.archiveFile
             }
         }
     }
@@ -43,19 +53,17 @@ abstract class InstallerJson extends DefaultTask {
     @TaskAction
     protected void exec() {
         def libs = libraries
-        [
-            project.tasks.universalJar,
-            project.tasks.serverShimJar
-        ].forEach { AbstractArchiveTask packed ->
-            def info = Util.getMavenInfoFromTask(packed)
-            libs.put(info.name, [
-                name: info.name,
+        for (def child : packedDependencies.get().collect{ project.rootProject.tasks.findByPath(it) } + [project.universalJar]) {
+            def dep = Util.getMavenDep(child)
+            def path = Util.getMavenPath(child)
+            libs.put(dep.toString(), [
+                name: dep,
                 downloads: [
                     artifact: [
-                        path: info.path,
-                        url: "https://maven.minecraftforge.net/$info.path",
-                        sha1: packed.archiveFile.get().asFile.sha1(),
-                        size: packed.archiveFile.get().asFile.length()
+                        path: path,
+                        url: "https://maven.minecraftforge.net/${path}",
+                        sha1: child.archiveFile.get().asFile.sha1(),
+                        size: child.archiveFile.get().asFile.length()
                     ]
                 ]
             ])

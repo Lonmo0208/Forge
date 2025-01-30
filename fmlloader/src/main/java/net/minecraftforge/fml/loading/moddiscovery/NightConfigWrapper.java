@@ -1,13 +1,25 @@
 /*
- * Copyright (c) Forge Development LLC and contributors
- * SPDX-License-Identifier: LGPL-2.1-only
+ * Minecraft Forge
+ * Copyright (c) 2016-2021.
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation version 2.1
+ * of the License.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
 package net.minecraftforge.fml.loading.moddiscovery;
 
 import com.electronwill.nightconfig.core.UnmodifiableConfig;
-import com.google.common.collect.ImmutableMap;
-
 import net.minecraftforge.forgespi.language.IConfigurable;
 import net.minecraftforge.forgespi.language.IModFileInfo;
 
@@ -17,13 +29,9 @@ import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
-import org.jetbrains.annotations.ApiStatus;
-import org.jetbrains.annotations.Nullable;
-
 import static java.util.Arrays.asList;
 
-@ApiStatus.Internal
-final class NightConfigWrapper implements IConfigurable {
+public class NightConfigWrapper implements IConfigurable {
     private final UnmodifiableConfig config;
     private IModFileInfo file;
 
@@ -31,51 +39,32 @@ final class NightConfigWrapper implements IConfigurable {
         this.config = config;
     }
 
-    private NightConfigWrapper(UnmodifiableConfig config, IModFileInfo file) {
-        this.config = config;
+    NightConfigWrapper setFile(IModFileInfo file) {
         this.file = file;
-    }
-
-    void setFile(IModFileInfo file) {
-        this.file = file;
+        return this;
     }
 
     @Override
-    public <T> Optional<T> getConfigElement(String key) {
-        var path = List.of(key);
-        return Optional.ofNullable(validate(this.config.get(path), path));
-    }
-
-    @Override
-    public <T> Optional<T> getConfigElement(final String... key) {
-        var path = asList(key);
-        return Optional.ofNullable(validate(this.config.get(path), path));
-    }
-
     @SuppressWarnings("unchecked")
-    private <T> T validate(@Nullable T value, List<String> path) {
-        if (value instanceof UnmodifiableConfig cfg) {
-            // New Night config doesn't implement valueMap(), so do a copy.
-            var entries = cfg.entrySet();
-            var builder = ImmutableMap.builderWithExpectedSize(entries.size());
-            for (var e : entries)
-                builder.put(e.getKey(), e.getValue());
-            return (T) builder.build();
-        } else if (value instanceof ArrayList<?> al && !al.isEmpty() && al.getFirst() instanceof UnmodifiableConfig) {
-            throw new InvalidModFileException("The configuration path " + path + " is invalid. I wasn't expecting a multi-object list - remove one of the [[ ]]", file);
-        }
-        return value;
+    public <T> Optional<T> getConfigElement(final String... key) {
+        return this.config.getOptional(asList(key)).map(value -> {
+            if (value instanceof UnmodifiableConfig) {
+                return (T) ((UnmodifiableConfig) value).valueMap();
+            }
+            return (T) value;
+        });
     }
 
     @Override
     public List<? extends IConfigurable> getConfigList(final String... key) {
         final List<String> path = asList(key);
         if (this.config.contains(path) && !(this.config.get(path) instanceof Collection)) {
-            throw new InvalidModFileException("The configuration path " + path + " is invalid. Expecting a collection!", file);
+            throw new InvalidModFileException("The configuration path "+path+" is invalid. Expecting a collection!", file);
         }
         final Collection<UnmodifiableConfig> nestedConfigs = this.config.getOrElse(path, ArrayList::new);
         return nestedConfigs.stream()
-                .map(conf -> new NightConfigWrapper(conf, file))
+                .map(NightConfigWrapper::new)
+                .map(cw->cw.setFile(file))
                 .collect(Collectors.toList());
     }
 }

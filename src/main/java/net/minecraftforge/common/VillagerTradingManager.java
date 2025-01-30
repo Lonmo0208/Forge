@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Forge Development LLC and contributors
+ * Minecraft Forge - Forge Development LLC
  * SPDX-License-Identifier: LGPL-2.1-only
  */
 
@@ -29,12 +29,11 @@ public class VillagerTradingManager
 
     static
     {
-        VillagerTrades.TRADES.forEach((key, value) -> {
+        VillagerTrades.TRADES.entrySet().forEach(e ->
+        {
             Int2ObjectMap<ItemListing[]> copy = new Int2ObjectOpenHashMap<>();
-            for (var ent : value.int2ObjectEntrySet()) {
-                copy.put(ent.getIntKey(), Arrays.copyOf(ent.getValue(), ent.getValue().length));
-            }
-            VANILLA_TRADES.put(key, copy);
+            e.getValue().int2ObjectEntrySet().forEach(ent -> copy.put(ent.getIntKey(), Arrays.copyOf(ent.getValue(), ent.getValue().length)));
+            VANILLA_TRADES.put(e.getKey(), copy);
         });
         VillagerTrades.WANDERING_TRADER_TRADES.int2ObjectEntrySet().forEach(e -> WANDERER_TRADES.put(e.getIntKey(), Arrays.copyOf(e.getValue(), e.getValue().length)));
     }
@@ -64,7 +63,7 @@ public class VillagerTradingManager
      */
     private static void postVillagerEvents()
     {
-        for (VillagerProfession prof : ForgeRegistries.VILLAGER_PROFESSIONS)
+        for (VillagerProfession prof : ForgeRegistries.PROFESSIONS)
         {
             Int2ObjectMap<ItemListing[]> trades = VANILLA_TRADES.getOrDefault(prof, new Int2ObjectOpenHashMap<>());
             Int2ObjectMap<List<ItemListing>> mutableTrades = new Int2ObjectOpenHashMap<>();
@@ -72,14 +71,13 @@ public class VillagerTradingManager
             {
                 mutableTrades.put(i, NonNullList.create());
             }
-            for (var entry : trades.int2ObjectEntrySet()) {
-                Arrays.stream(entry.getValue()).forEach(mutableTrades.get(entry.getIntKey())::add);
-            }
+            trades.int2ObjectEntrySet().forEach(e ->
+            {
+                Arrays.stream(e.getValue()).forEach(mutableTrades.get(e.getIntKey())::add);
+            });
             MinecraftForge.EVENT_BUS.post(new VillagerTradesEvent(mutableTrades, prof));
             Int2ObjectMap<ItemListing[]> newTrades = new Int2ObjectOpenHashMap<>();
-            for (var entry : mutableTrades.int2ObjectEntrySet()) {
-                newTrades.put(entry.getIntKey(), entry.getValue().toArray(new ItemListing[0]));
-            }
+            mutableTrades.int2ObjectEntrySet().forEach(e -> newTrades.put(e.getIntKey(), e.getValue().toArray(new ItemListing[0])));
             VillagerTrades.TRADES.put(prof, newTrades);
         }
     }

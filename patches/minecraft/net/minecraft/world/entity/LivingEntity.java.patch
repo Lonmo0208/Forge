@@ -1,690 +1,636 @@
 --- a/net/minecraft/world/entity/LivingEntity.java
 +++ b/net/minecraft/world/entity/LivingEntity.java
-@@ -136,7 +_,7 @@
- import net.minecraft.world.scores.Scoreboard;
- import org.slf4j.Logger;
+@@ -124,7 +_,9 @@
+    private static final UUID f_20929_ = UUID.fromString("662A6B8D-DA3E-4C1C-8813-96EA6097278D");
+    private static final UUID f_20959_ = UUID.fromString("87f46a96-686f-4796-b035-22e16ee9e038");
+    private static final UUID f_147184_ = UUID.fromString("1eaf83ff-7207-4596-b37a-d7a07b3ec4ce");
++   private static final UUID SLOW_FALLING_ID = UUID.fromString("A5B6CF2A-2F7C-31EF-9022-7C3E7D5E6ABA");
+    private static final AttributeModifier f_20960_ = new AttributeModifier(f_20929_, "Sprinting speed boost", (double)0.3F, AttributeModifier.Operation.MULTIPLY_TOTAL);
++   private static final AttributeModifier SLOW_FALLING = new AttributeModifier(SLOW_FALLING_ID, "Slow falling acceleration reduction", -0.07, AttributeModifier.Operation.ADDITION); // Add -0.07 to 0.08 so we get the vanilla default of 0.01
+    public static final int f_147166_ = 2;
+    public static final int f_147167_ = 4;
+    public static final int f_147168_ = 98;
+@@ -277,7 +_,7 @@
+    }
  
--public abstract class LivingEntity extends Entity implements Attackable {
-+public abstract class LivingEntity extends Entity implements Attackable, net.minecraftforge.common.extensions.IForgeLivingEntity {
-     private static final Logger LOGGER = LogUtils.getLogger();
-     private static final String TAG_ACTIVE_EFFECTS = "active_effects";
-     private static final ResourceLocation SPEED_MODIFIER_POWDER_SNOW_ID = ResourceLocation.withDefaultNamespace("powder_snow");
-@@ -172,6 +_,8 @@
-     public static final float EXTRA_RENDER_CULLING_SIZE_WITH_BIG_HAT = 0.5F;
-     public static final float DEFAULT_BABY_SCALE = 0.5F;
-     public static final String ATTRIBUTES_FIELD = "attributes";
-+    /** Forge: Use a variant that calls {@link ItemStack#isMonsterDisguise(Player, net.minecraft.world.entity.monster.Monster)} and {@link net.minecraftforge.event.entity.living.MonsterDisguiseEvent} */
-+    @Deprecated
-     public static final Predicate<LivingEntity> PLAYER_NOT_WEARING_DISGUISE_ITEM = p_358894_ -> {
-         if (p_358894_ instanceof Player player) {
-             ItemStack itemstack = player.getItemBySlot(EquipmentSlot.HEAD);
-@@ -270,7 +_,8 @@
-         this.setYRot((float)(Math.random() * (float) (Math.PI * 2)));
-         this.yHeadRot = this.getYRot();
-         NbtOps nbtops = NbtOps.INSTANCE;
--        this.brain = this.makeBrain(new Dynamic<>(nbtops, nbtops.createMap(ImmutableMap.of(nbtops.createString("memories"), nbtops.emptyMap()))));
-+        var dyn = new Dynamic<>(nbtops, nbtops.createMap(ImmutableMap.of(nbtops.createString("memories"), nbtops.emptyMap())));
-+        this.brain = net.minecraftforge.common.ForgeHooks.onLivingMakeBrain(this, this.makeBrain(dyn), dyn);
-     }
+    public static AttributeSupplier.Builder m_21183_() {
+-      return AttributeSupplier.m_22244_().m_22266_(Attributes.f_22276_).m_22266_(Attributes.f_22278_).m_22266_(Attributes.f_22279_).m_22266_(Attributes.f_22284_).m_22266_(Attributes.f_22285_);
++      return AttributeSupplier.m_22244_().m_22266_(Attributes.f_22276_).m_22266_(Attributes.f_22278_).m_22266_(Attributes.f_22279_).m_22266_(Attributes.f_22284_).m_22266_(Attributes.f_22285_).m_22266_(net.minecraftforge.common.ForgeMod.SWIM_SPEED.get()).m_22266_(net.minecraftforge.common.ForgeMod.NAMETAG_DISTANCE.get()).m_22266_(net.minecraftforge.common.ForgeMod.ENTITY_GRAVITY.get());
+    }
  
-     public Brain<?> getBrain() {
-@@ -324,7 +_,8 @@
-             .add(Attributes.EXPLOSION_KNOCKBACK_RESISTANCE)
-             .add(Attributes.WATER_MOVEMENT_EFFICIENCY)
-             .add(Attributes.MOVEMENT_EFFICIENCY)
--            .add(Attributes.ATTACK_KNOCKBACK);
-+            .add(Attributes.ATTACK_KNOCKBACK)
-+            .add(Attributes.JUMP_STRENGTH);
-     }
+    protected void m_7840_(double p_20990_, boolean p_20991_, BlockState p_20992_, BlockPos p_20993_) {
+@@ -295,7 +_,8 @@
+          if (!p_20992_.m_60795_()) {
+             double d0 = Math.min((double)(0.2F + f / 15.0F), 2.5D);
+             int i = (int)(150.0D * d0);
+-            ((ServerLevel)this.f_19853_).m_8767_(new BlockParticleOption(ParticleTypes.f_123794_, p_20992_), this.m_20185_(), this.m_20186_(), this.m_20189_(), i, 0.0D, 0.0D, 0.0D, (double)0.15F);
++            if (!p_20992_.addLandingEffects((ServerLevel)this.f_19853_, p_20993_, p_20992_, this, i))
++            ((ServerLevel)this.f_19853_).m_8767_(new BlockParticleOption(ParticleTypes.f_123794_, p_20992_).setPos(p_20993_), this.m_20185_(), this.m_20186_(), this.m_20189_(), i, 0.0D, 0.0D, 0.0D, (double)0.15F);
+          }
+       }
  
-     @Override
-@@ -352,7 +_,8 @@
-                 float f = (float)Mth.ceil((double)this.fallDistance - d7);
-                 double d4 = Math.min((double)(0.2F + f / 15.0F), 2.5);
-                 int i = (int)(150.0 * d4);
--                serverlevel.sendParticles(new BlockParticleOption(ParticleTypes.BLOCK, p_20992_), d0, d1, d2, i, 0.0, 0.0, 0.0, 0.15F);
-+                if (!p_20992_.addLandingEffects((ServerLevel) this.level(), p_20993_, p_20992_, this, i))
-+                ((ServerLevel)this.level()).sendParticles(new BlockParticleOption(ParticleTypes.BLOCK, p_20992_).setPos(p_20993_), d0, d1, d2, i, 0.0, 0.0, 0.0, 0.15F);
-             }
-         }
- 
-@@ -362,6 +_,7 @@
-         }
-     }
- 
-+    @Deprecated //FORGE: Use canDrownInFluidType instead
-     public final boolean canBreatheUnderwater() {
-         return this.getType().is(EntityTypeTags.CAN_BREATHE_UNDER_WATER);
-     }
-@@ -408,6 +_,10 @@
-                 }
+@@ -359,7 +_,7 @@
+                }
              }
  
+-            if (!this.f_19853_.f_46443_ && this.m_20159_() && this.m_20202_() != null && !this.m_20202_().m_6146_()) {
++            if (!this.f_19853_.f_46443_ && this.m_20159_() && this.m_20202_() != null && !this.m_20202_().canBeRiddenInWater(this)) {
+                this.m_8127_();
+             }
+          } else if (this.m_20146_() < this.m_6062_()) {
+@@ -723,7 +_,7 @@
+             if (!mobeffectinstance.m_19552_(this, () -> {
+                this.m_141973_(mobeffectinstance, true, (Entity)null);
+             })) {
+-               if (!this.f_19853_.f_46443_) {
++               if (!this.f_19853_.f_46443_ && !net.minecraftforge.common.MinecraftForge.EVENT_BUS.post(new net.minecraftforge.event.entity.living.PotionEvent.PotionExpiryEvent(this, mobeffectinstance))) {
+                   iterator.remove();
+                   this.m_7285_(mobeffectinstance);
+                }
+@@ -773,8 +_,10 @@
+          this.m_6842_(false);
+       } else {
+          Collection<MobEffectInstance> collection = this.f_20945_.values();
+-         this.f_19804_.m_135381_(f_20963_, m_21179_(collection));
+-         this.f_19804_.m_135381_(f_20962_, PotionUtils.m_43564_(collection));
++         net.minecraftforge.event.entity.living.PotionColorCalculationEvent event = new net.minecraftforge.event.entity.living.PotionColorCalculationEvent(this, PotionUtils.m_43564_(collection), m_21179_(collection), collection);
++         net.minecraftforge.common.MinecraftForge.EVENT_BUS.post(event);
++         this.f_19804_.m_135381_(f_20963_, event.areParticlesHidden());
++         this.f_19804_.m_135381_(f_20962_, event.getColor());
+          this.m_6842_(this.m_21023_(MobEffects.f_19609_));
+       }
+ 
+@@ -810,7 +_,7 @@
+             d0 *= 0.5D;
+          }
+       }
+-
++      d0 = net.minecraftforge.common.ForgeHooks.getEntityVisibilityMultiplier(this, p_20969_, d0);
+       return d0;
+    }
+ 
+@@ -853,7 +_,9 @@
+ 
+          boolean flag;
+          for(flag = false; iterator.hasNext(); flag = true) {
+-            this.m_7285_(iterator.next());
++            MobEffectInstance effect = iterator.next();
++            if(net.minecraftforge.common.MinecraftForge.EVENT_BUS.post(new net.minecraftforge.event.entity.living.PotionEvent.PotionRemoveEvent(this, effect))) continue;
++            this.m_7285_(effect);
+             iterator.remove();
+          }
+ 
+@@ -887,6 +_,7 @@
+          return false;
+       } else {
+          MobEffectInstance mobeffectinstance = this.f_20945_.get(p_147208_.m_19544_());
++         net.minecraftforge.common.MinecraftForge.EVENT_BUS.post(new net.minecraftforge.event.entity.living.PotionEvent.PotionAddedEvent(this, mobeffectinstance, p_147208_, p_147209_));
+          if (mobeffectinstance == null) {
+             this.f_20945_.put(p_147208_.m_19544_(), p_147208_);
+             this.m_142540_(p_147208_, p_147209_);
+@@ -901,6 +_,9 @@
+    }
+ 
+    public boolean m_7301_(MobEffectInstance p_21197_) {
++      net.minecraftforge.event.entity.living.PotionEvent.PotionApplicableEvent event = new net.minecraftforge.event.entity.living.PotionEvent.PotionApplicableEvent(this, p_21197_);
++      net.minecraftforge.common.MinecraftForge.EVENT_BUS.post(event);
++      if (event.getResult() != net.minecraftforge.eventbus.api.Event.Result.DEFAULT) return event.getResult() == net.minecraftforge.eventbus.api.Event.Result.ALLOW;
+       if (this.m_6336_() == MobType.f_21641_) {
+          MobEffect mobeffect = p_21197_.m_19544_();
+          if (mobeffect == MobEffects.f_19605_ || mobeffect == MobEffects.f_19614_) {
+@@ -933,6 +_,7 @@
+    }
+ 
+    public boolean m_21195_(MobEffect p_21196_) {
++      if (net.minecraftforge.common.MinecraftForge.EVENT_BUS.post(new net.minecraftforge.event.entity.living.PotionEvent.PotionRemoveEvent(this, p_21196_))) return false;
+       MobEffectInstance mobeffectinstance = this.m_6234_(p_21196_);
+       if (mobeffectinstance != null) {
+          this.m_7285_(mobeffectinstance);
+@@ -969,6 +_,8 @@
+    }
+ 
+    public void m_5634_(float p_21116_) {
++      p_21116_ = net.minecraftforge.event.ForgeEventFactory.onLivingHeal(this, p_21116_);
++      if (p_21116_ <= 0) return;
+       float f = this.m_21223_();
+       if (f > 0.0F) {
+          this.m_21153_(f + p_21116_);
+@@ -989,6 +_,7 @@
+    }
+ 
+    public boolean m_6469_(DamageSource p_21016_, float p_21017_) {
++      if (!net.minecraftforge.common.ForgeHooks.onLivingAttack(this, p_21016_, p_21017_)) return false;
+       if (this.m_6673_(p_21016_)) {
+          return false;
+       } else if (this.f_19853_.f_46443_) {
+@@ -1007,9 +_,11 @@
+          boolean flag = false;
+          float f1 = 0.0F;
+          if (p_21017_ > 0.0F && this.m_21275_(p_21016_)) {
+-            this.m_7909_(p_21017_);
+-            f1 = p_21017_;
+-            p_21017_ = 0.0F;
++            net.minecraftforge.event.entity.living.ShieldBlockEvent ev = net.minecraftforge.common.ForgeHooks.onShieldBlock(this, p_21016_, p_21017_);
++            if(!ev.isCanceled()) {
++            if(ev.shieldTakesDamage()) this.m_7909_(p_21017_);
++            f1 = ev.getBlockedDamage();
++            p_21017_ -= ev.getBlockedDamage();
+             if (!p_21016_.m_19360_()) {
+                Entity entity = p_21016_.m_7640_();
+                if (entity instanceof LivingEntity) {
+@@ -1019,6 +_,7 @@
+ 
+             flag = true;
+          }
++         }
+ 
+          this.f_20924_ = 1.5F;
+          boolean flag1 = true;
+@@ -1053,11 +_,11 @@
+             if (entity1 instanceof Player) {
+                this.f_20889_ = 100;
+                this.f_20888_ = (Player)entity1;
+-            } else if (entity1 instanceof Wolf) {
+-               Wolf wolf = (Wolf)entity1;
+-               if (wolf.m_21824_()) {
++            } else if (entity1 instanceof net.minecraft.world.entity.TamableAnimal) {
++               net.minecraft.world.entity.TamableAnimal tamableEntity = (net.minecraft.world.entity.TamableAnimal)entity1;
++               if (tamableEntity.m_21824_()) {
+                   this.f_20889_ = 100;
+-                  LivingEntity livingentity = wolf.m_142480_();
++                  LivingEntity livingentity = tamableEntity.m_142480_();
+                   if (livingentity != null && livingentity.m_6095_() == EntityType.f_20532_) {
+                      this.f_20888_ = (Player)livingentity;
+                   } else {
+@@ -1130,7 +_,7 @@
+          if (this instanceof ServerPlayer) {
+             CriteriaTriggers.f_10574_.m_35174_((ServerPlayer)this, p_21016_, f, p_21017_, flag);
+             if (f1 > 0.0F && f1 < 3.4028235E37F) {
+-               ((ServerPlayer)this).m_36222_(Stats.f_12932_, Math.round(f1 * 10.0F));
++               ((ServerPlayer)this).m_6278_(Stats.f_12988_.m_12902_(Stats.f_12932_), Math.round(f1 * 10.0F));
+             }
+          }
+ 
+@@ -1173,7 +_,7 @@
+          if (itemstack != null) {
+             if (this instanceof ServerPlayer) {
+                ServerPlayer serverplayer = (ServerPlayer)this;
+-               serverplayer.m_36246_(Stats.f_12982_.m_12902_(Items.f_42747_));
++               serverplayer.m_6278_(Stats.f_12982_.m_12902_(Items.f_42747_), 1);
+                CriteriaTriggers.f_10551_.m_74431_(serverplayer, itemstack);
+             }
+ 
+@@ -1243,6 +_,7 @@
+    }
+ 
+    public void m_6667_(DamageSource p_21014_) {
++      if (net.minecraftforge.common.ForgeHooks.onLivingDeath(this, p_21014_)) return;
+       if (!this.m_146910_() && !this.f_20890_) {
+          Entity entity = p_21014_.m_7639_();
+          LivingEntity livingentity = this.m_21232_();
+@@ -1279,10 +_,10 @@
+       if (!this.f_19853_.f_46443_) {
+          boolean flag = false;
+          if (p_21269_ instanceof WitherBoss) {
+-            if (this.f_19853_.m_46469_().m_46207_(GameRules.f_46132_)) {
++            if (net.minecraftforge.event.ForgeEventFactory.getMobGriefingEvent(this.f_19853_, p_21269_)) {
+                BlockPos blockpos = this.m_142538_();
+                BlockState blockstate = Blocks.f_50070_.m_49966_();
+-               if (this.f_19853_.m_8055_(blockpos).m_60795_() && blockstate.m_60710_(this.f_19853_, blockpos)) {
++               if (this.f_19853_.m_46859_(blockpos) && blockstate.m_60710_(this.f_19853_, blockpos)) {
+                   this.f_19853_.m_7731_(blockpos, blockstate, 3);
+                   flag = true;
+                }
+@@ -1299,12 +_,9 @@
+ 
+    protected void m_6668_(DamageSource p_21192_) {
+       Entity entity = p_21192_.m_7639_();
+-      int i;
+-      if (entity instanceof Player) {
+-         i = EnchantmentHelper.m_44930_((LivingEntity)entity);
+-      } else {
+-         i = 0;
+-      }
 +
-+            int airSupply = this.getAirSupply();
-+            net.minecraftforge.common.ForgeHooks.onLivingBreathe(this, airSupply - decreaseAirSupply(airSupply), increaseAirSupply(airSupply) - airSupply);
-+            if (false) // Forge: Handled in ForgeHooks#onLivingBreathe(LivingEntity, int, int)
-             if (this.isEyeInFluid(FluidTags.WATER)
-                 && !this.level().getBlockState(BlockPos.containing(this.getX(), this.getEyeY(), this.getZ())).is(Blocks.BUBBLE_COLUMN)) {
-                 boolean flag1 = !this.canBreatheUnderwater() && !MobEffectUtil.hasWaterBreathing(this) && (!flag || !((Player)this).getAbilities().invulnerable);
-@@ -455,7 +_,7 @@
-             }
-         }
++      int i = net.minecraftforge.common.ForgeHooks.getLootingLevel(this, entity, p_21192_);
++      this.captureDrops(new java.util.ArrayList<>());
  
--        if (this.isAlive() && (this.isInWaterRainOrBubble() || this.isInPowderSnow)) {
-+        if (this.isAlive() && (this.isInWaterRainOrBubble() || this.isInPowderSnow || this.isInFluidType((fluidType, height) -> this.canFluidExtinguish(fluidType)))) {
-             this.extinguishFire();
-         }
+       boolean flag = this.f_20889_ > 0;
+       if (this.m_6125_() && this.f_19853_.m_46469_().m_46207_(GameRules.f_46135_)) {
+@@ -1314,6 +_,10 @@
  
-@@ -782,7 +_,8 @@
-         }
- 
-         if (p_21096_.contains("Brain", 10)) {
--            this.brain = this.makeBrain(new Dynamic<>(NbtOps.INSTANCE, p_21096_.get("Brain")));
-+            var dyn = new Dynamic<>(NbtOps.INSTANCE, p_21096_.get("Brain"));
-+            this.brain = net.minecraftforge.common.ForgeHooks.onLivingMakeBrain(this, this.makeBrain(dyn), dyn);
-         }
-     }
- 
-@@ -794,7 +_,7 @@
-                 Holder<MobEffect> holder = iterator.next();
-                 MobEffectInstance mobeffectinstance = this.activeEffects.get(holder);
-                 if (!mobeffectinstance.tick(this, () -> this.onEffectUpdated(mobeffectinstance, true, null))) {
--                    if (!this.level().isClientSide) {
-+                    if (!this.level().isClientSide && !net.minecraftforge.event.ForgeEventFactory.onLivingEffectExpire(this, mobeffectinstance)) {
-                         iterator.remove();
-                         this.onEffectsRemoved(List.of(mobeffectinstance));
-                     }
-@@ -875,6 +_,7 @@
-             }
-         }
- 
-+        d0 = net.minecraftforge.common.ForgeHooks.getEntityVisibilityMultiplier(this, p_20969_, d0);
-         return d0;
-     }
- 
-@@ -944,6 +_,7 @@
-         } else {
-             MobEffectInstance mobeffectinstance = this.activeEffects.get(p_147208_.getEffect());
-             boolean flag = false;
-+            net.minecraftforge.event.ForgeEventFactory.onLivingEffectAdd(this, mobeffectinstance, p_147208_, p_147209_);
-             if (mobeffectinstance == null) {
-                 this.activeEffects.put(p_147208_.getEffect(), p_147208_);
-                 this.onEffectAdded(p_147208_, p_147209_);
-@@ -960,6 +_,10 @@
-     }
- 
-     public boolean canBeAffected(MobEffectInstance p_21197_) {
-+        var eventResult = net.minecraftforge.event.ForgeEventFactory.onLivingEffectCanApply(this, p_21197_).getResult();
-+        if (!eventResult.isDefault()) {
-+            return eventResult.isAllowed();
-+        }
-         if (this.getType().is(EntityTypeTags.IMMUNE_TO_INFESTED)) {
-             return !p_21197_.is(MobEffects.INFESTED);
-         } else if (this.getType().is(EntityTypeTags.IMMUNE_TO_OOZING)) {
-@@ -993,6 +_,9 @@
-     }
- 
-     public boolean removeEffect(Holder<MobEffect> p_335910_) {
-+        if (net.minecraftforge.event.ForgeEventFactory.onLivingEffectRemove(this, p_335910_.get())) {
-+            return false;
-+        }
-         MobEffectInstance mobeffectinstance = this.removeEffectNoUpdate(p_335910_);
-         if (mobeffectinstance != null) {
-             this.onEffectsRemoved(List.of(mobeffectinstance));
-@@ -1036,6 +_,9 @@
-         this.effectsDirty = true;
-         if (!this.level().isClientSide) {
-             for (MobEffectInstance mobeffectinstance : p_364717_) {
-+                if (net.minecraftforge.event.ForgeEventFactory.onLivingEffectRemove(this, mobeffectinstance)) {
-+                    continue;
-+                }
-                 mobeffectinstance.getEffect().value().removeAttributeModifiers(this.getAttributes());
- 
-                 for (Entity entity : this.getPassengers()) {
-@@ -1074,6 +_,10 @@
-     }
- 
-     public void heal(float p_21116_) {
-+        p_21116_ = net.minecraftforge.event.ForgeEventFactory.onLivingHeal(this, p_21116_);
-+        if (p_21116_ <= 0) {
-+            return;
-+        }
-         float f = this.getHealth();
-         if (f > 0.0F) {
-             this.setHealth(f + p_21116_);
-@@ -1094,6 +_,9 @@
- 
-     @Override
-     public boolean hurtServer(ServerLevel p_361743_, DamageSource p_361865_, float p_365677_) {
-+        if (!net.minecraftforge.common.ForgeHooks.onLivingAttack(this, p_361865_, p_365677_)) {
-+            return false;
-+        }
-         if (this.isInvulnerableTo(p_361743_, p_361865_)) {
-             return false;
-         } else if (this.isDeadOrDying()) {
-@@ -1114,14 +_,18 @@
-             boolean flag = false;
-             float f1 = 0.0F;
-             if (p_365677_ > 0.0F && this.isDamageSourceBlocked(p_361865_)) {
-+                var ev = net.minecraftforge.event.ForgeEventFactory.onShieldBlock(this, p_361865_, p_365677_);
-+                if (!ev.isCanceled()) {
-+                    if (ev.shieldTakesDamage())
-                 this.hurtCurrentlyUsedShield(p_365677_);
--                f1 = p_365677_;
--                p_365677_ = 0.0F;
-+                f1 = ev.getBlockedDamage();
-+                p_365677_ -= ev.getBlockedDamage();
-                 if (!p_361865_.is(DamageTypeTags.IS_PROJECTILE) && p_361865_.getDirectEntity() instanceof LivingEntity livingentity) {
-                     this.blockUsingShield(livingentity);
-                 }
- 
--                flag = true;
-+                flag = p_365677_ <= 0;
-+                }
-             }
- 
-             if (p_361865_.is(DamageTypeTags.IS_FREEZING) && this.getType().is(EntityTypeTags.FREEZE_HURTS_EXTRA_TYPES)) {
-@@ -1212,7 +_,7 @@
-             if (this instanceof ServerPlayer serverplayer) {
-                 CriteriaTriggers.ENTITY_HURT_PLAYER.trigger(serverplayer, p_361865_, f, p_365677_, flag);
-                 if (f1 > 0.0F && f1 < 3.4028235E37F) {
--                    serverplayer.awardStat(Stats.DAMAGE_BLOCKED_BY_SHIELD, Math.round(f1 * 10.0F));
-+                    ((ServerPlayer)this).awardStat(Stats.CUSTOM.get(Stats.DAMAGE_BLOCKED_BY_SHIELD), Math.round(f1 * 10.0F));
-                 }
-             }
- 
-@@ -1240,7 +_,7 @@
-             this.lastHurtByPlayer = player;
-             return player;
-         } else {
--            if (entity instanceof Wolf wolf && wolf.isTame()) {
-+            if (entity instanceof net.minecraft.world.entity.TamableAnimal wolf && wolf.isTame()) {
-                 this.lastHurtByPlayerTime = 100;
-                 if (wolf.getOwner() instanceof Player player1) {
-                     this.lastHurtByPlayer = player1;
-@@ -1273,7 +_,7 @@
-             for (InteractionHand interactionhand : InteractionHand.values()) {
-                 ItemStack itemstack1 = this.getItemInHand(interactionhand);
-                 deathprotection = itemstack1.get(DataComponents.DEATH_PROTECTION);
--                if (deathprotection != null) {
-+                if (deathprotection != null && net.minecraftforge.common.ForgeHooks.onLivingUseTotem(this, p_21263_, itemstack1, interactionhand)) {
-                     itemstack = itemstack1.copy();
-                     itemstack1.shrink(1);
-                     break;
-@@ -1357,6 +_,7 @@
-     }
- 
-     public void die(DamageSource p_21014_) {
-+        if (net.minecraftforge.event.ForgeEventFactory.onLivingDeath(this, p_21014_)) return;
-         if (!this.isRemoved() && !this.dead) {
-             Entity entity = p_21014_.getEntity();
-             LivingEntity livingentity = this.getKillCredit();
-@@ -1392,10 +_,10 @@
-         if (this.level() instanceof ServerLevel serverlevel) {
-             boolean flag = false;
-             if (p_21269_ instanceof WitherBoss) {
--                if (serverlevel.getGameRules().getBoolean(GameRules.RULE_MOBGRIEFING)) {
-+                if (net.minecraftforge.event.ForgeEventFactory.getMobGriefingEvent(serverlevel, p_21269_)) {
-                     BlockPos blockpos = this.blockPosition();
-                     BlockState blockstate = Blocks.WITHER_ROSE.defaultBlockState();
--                    if (this.level().getBlockState(blockpos).isAir() && blockstate.canSurvive(this.level(), blockpos)) {
-+                    if (this.level().isEmptyBlock(blockpos) && blockstate.canSurvive(this.level(), blockpos)) {
-                         this.level().setBlock(blockpos, blockstate, 3);
-                         flag = true;
-                     }
-@@ -1410,6 +_,7 @@
-     }
- 
-     protected void dropAllDeathLoot(ServerLevel p_342160_, DamageSource p_21192_) {
-+        this.captureDrops(new java.util.ArrayList<>());
-         boolean flag = this.lastHurtByPlayerTime > 0;
-         if (this.shouldDropLoot() && p_342160_.getGameRules().getBoolean(GameRules.RULE_DOMOBLOOT)) {
-             this.dropFromLootTable(p_342160_, p_21192_, flag);
-@@ -1418,6 +_,11 @@
- 
-         this.dropEquipment(p_342160_);
-         this.dropExperience(p_342160_, p_21192_.getEntity());
+       this.m_5907_();
+       this.m_21226_();
 +
-+        var drops = captureDrops(null);
-+        if (!net.minecraftforge.event.ForgeEventFactory.onLivingDrops(this, p_21192_, drops, lastHurtByPlayerTime > 0)) {
-+            drops.forEach(e -> level().addFreshEntity(e));
-+        }
-     }
++      Collection<ItemEntity> drops = captureDrops(null);
++      if (!net.minecraftforge.common.ForgeHooks.onLivingDrops(this, p_21192_, drops, i, f_20889_ > 0))
++         drops.forEach(e -> f_19853_.m_7967_(e));
+    }
  
-     protected void dropEquipment(ServerLevel p_365823_) {
-@@ -1425,7 +_,8 @@
+    protected void m_5907_() {
+@@ -1321,7 +_,8 @@
  
-     protected void dropExperience(ServerLevel p_370040_, @Nullable Entity p_342525_) {
-         if (!this.wasExperienceConsumed() && (this.isAlwaysExperienceDropper() || this.lastHurtByPlayerTime > 0 && this.shouldDropExperience() && p_370040_.getGameRules().getBoolean(GameRules.RULE_DOMOBLOOT))) {
--            ExperienceOrb.award(p_370040_, this.position(), this.getExperienceReward(p_370040_, p_342525_));
-+            int reward = net.minecraftforge.event.ForgeEventFactory.getExperienceDrop(this, this.lastHurtByPlayer, this.getExperienceReward(p_370040_, p_342525_));
-+            ExperienceOrb.award(p_370040_, this.position(), reward);
-         }
-     }
+    protected void m_21226_() {
+       if (this.f_19853_ instanceof ServerLevel && !this.m_213598_() && (this.m_6124_() || this.f_20889_ > 0 && this.m_6149_() && this.f_19853_.m_46469_().m_46207_(GameRules.f_46135_))) {
+-         ExperienceOrb.m_147082_((ServerLevel)this.f_19853_, this.m_20182_(), this.m_213004_());
++         int reward = net.minecraftforge.event.ForgeEventFactory.getExperienceDrop(this, this.f_20888_, this.m_213004_());
++         ExperienceOrb.m_147082_((ServerLevel)this.f_19853_, this.m_20182_(), reward);
+       }
  
-@@ -1501,6 +_,11 @@
-     }
+    }
+@@ -1337,7 +_,8 @@
+       ResourceLocation resourcelocation = this.m_5743_();
+       LootTable loottable = this.f_19853_.m_142572_().m_129898_().m_79217_(resourcelocation);
+       LootContext.Builder lootcontext$builder = this.m_7771_(p_21022_, p_21021_);
+-      loottable.m_79148_(lootcontext$builder.m_78975_(LootContextParamSets.f_81415_), this::m_19983_);
++      LootContext ctx = lootcontext$builder.m_78975_(LootContextParamSets.f_81415_);
++      loottable.m_79129_(ctx).forEach(this::m_19983_);
+    }
  
-     public void knockback(double p_147241_, double p_147242_, double p_147243_) {
-+        var event = net.minecraftforge.event.ForgeEventFactory.onLivingKnockBack(this, (float) p_147241_, p_147242_, p_147243_);
-+        if (event.isCanceled()) return;
-+        p_147241_ = event.getStrength();
-+        p_147242_ = event.getRatioX();
-+        p_147243_ = event.getRatioZ();
-         p_147241_ *= 1.0 - this.getAttributeValue(Attributes.KNOCKBACK_RESISTANCE);
-         if (!(p_147241_ <= 0.0)) {
-             this.hasImpulse = true;
-@@ -1582,6 +_,13 @@
-         } else {
-             BlockPos blockpos = this.blockPosition();
-             BlockState blockstate = this.getInBlockState();
-+            var ladderPos = net.minecraftforge.common.ForgeHooks.isLivingOnLadder(blockstate, level(), blockpos, this);
-+            if (ladderPos.isPresent()) {
-+                this.lastClimbablePos = ladderPos;
-+                return true;
-+            } else if (ladderPos != null) {
-+                return false;
+    protected LootContext.Builder m_7771_(boolean p_21105_, DamageSource p_21106_) {
+@@ -1350,6 +_,11 @@
+    }
+ 
+    public void m_147240_(double p_147241_, double p_147242_, double p_147243_) {
++      net.minecraftforge.event.entity.living.LivingKnockBackEvent event = net.minecraftforge.common.ForgeHooks.onLivingKnockBack(this, (float) p_147241_, p_147242_, p_147243_);
++      if(event.isCanceled()) return;
++      p_147241_ = event.getStrength();
++      p_147242_ = event.getRatioX();
++      p_147243_ = event.getRatioZ();
+       p_147241_ *= 1.0D - this.m_21133_(Attributes.f_22278_);
+       if (!(p_147241_ <= 0.0D)) {
+          this.f_19812_ = true;
+@@ -1411,15 +_,9 @@
+       } else {
+          BlockPos blockpos = this.m_142538_();
+          BlockState blockstate = this.m_146900_();
+-         if (this.m_213068_(blockpos, blockstate)) {
+-            this.f_20957_ = Optional.of(blockpos);
+-            return true;
+-         } else if (blockstate.m_60734_() instanceof TrapDoorBlock && this.m_21176_(blockpos, blockstate)) {
+-            this.f_20957_ = Optional.of(blockpos);
+-            return true;
+-         } else {
+-            return false;
+-         }
++         Optional<BlockPos> ladderPos = net.minecraftforge.common.ForgeHooks.isLivingOnLadder(blockstate, f_19853_, blockpos, this);
++         if (ladderPos.isPresent()) this.f_20957_ = ladderPos;
++         return ladderPos.isPresent();
+       }
+    }
+ 
+@@ -1439,6 +_,11 @@
+    }
+ 
+    public boolean m_142535_(float p_147187_, float p_147188_, DamageSource p_147189_) {
++      float[] ret = net.minecraftforge.common.ForgeHooks.onLivingFall(this, p_147187_, p_147188_);
++      if (ret == null) return false;
++      p_147187_ = ret[0];
++      p_147188_ = ret[1];
++
+       boolean flag = super.m_142535_(p_147187_, p_147188_, p_147189_);
+       int i = this.m_5639_(p_147187_, p_147188_);
+       if (i > 0) {
+@@ -1462,9 +_,10 @@
+          int i = Mth.m_14107_(this.m_20185_());
+          int j = Mth.m_14107_(this.m_20186_() - (double)0.2F);
+          int k = Mth.m_14107_(this.m_20189_());
+-         BlockState blockstate = this.f_19853_.m_8055_(new BlockPos(i, j, k));
++         BlockPos pos = new BlockPos(i, j, k);
++         BlockState blockstate = this.f_19853_.m_8055_(pos);
+          if (!blockstate.m_60795_()) {
+-            SoundType soundtype = blockstate.m_60827_();
++            SoundType soundtype = blockstate.getSoundType(f_19853_, pos, this);
+             this.m_5496_(soundtype.m_56779_(), soundtype.m_56773_() * 0.5F, soundtype.m_56774_() * 0.75F);
+          }
+ 
+@@ -1512,9 +_,9 @@
+             float f2 = f1 - p_21194_;
+             if (f2 > 0.0F && f2 < 3.4028235E37F) {
+                if (this instanceof ServerPlayer) {
+-                  ((ServerPlayer)this).m_36222_(Stats.f_12934_, Math.round(f2 * 10.0F));
++                  ((ServerPlayer)this).m_6278_(Stats.f_12988_.m_12902_(Stats.f_12934_), Math.round(f2 * 10.0F));
+                } else if (p_21193_.m_7639_() instanceof ServerPlayer) {
+-                  ((ServerPlayer)p_21193_.m_7639_()).m_36222_(Stats.f_12930_, Math.round(f2 * 10.0F));
++                  ((ServerPlayer)p_21193_.m_7639_()).m_6278_(Stats.f_12988_.m_12902_(Stats.f_12930_), Math.round(f2 * 10.0F));
+                }
+             }
+          }
+@@ -1534,19 +_,22 @@
+ 
+    protected void m_6475_(DamageSource p_21240_, float p_21241_) {
+       if (!this.m_6673_(p_21240_)) {
++         p_21241_ = net.minecraftforge.common.ForgeHooks.onLivingHurt(this, p_21240_, p_21241_);
++         if (p_21241_ <= 0) return;
+          p_21241_ = this.m_21161_(p_21240_, p_21241_);
+          p_21241_ = this.m_6515_(p_21240_, p_21241_);
+          float f2 = Math.max(p_21241_ - this.m_6103_(), 0.0F);
+          this.m_7911_(this.m_6103_() - (p_21241_ - f2));
+          float f = p_21241_ - f2;
+          if (f > 0.0F && f < 3.4028235E37F && p_21240_.m_7639_() instanceof ServerPlayer) {
+-            ((ServerPlayer)p_21240_.m_7639_()).m_36222_(Stats.f_12929_, Math.round(f * 10.0F));
++            ((ServerPlayer)p_21240_.m_7639_()).m_6278_(Stats.f_12988_.m_12902_(Stats.f_12929_), Math.round(f * 10.0F));
+          }
+ 
++         f2 = net.minecraftforge.common.ForgeHooks.onLivingDamage(this, p_21240_, f2);
+          if (f2 != 0.0F) {
+             float f1 = this.m_21223_();
+-            this.m_21153_(f1 - f2);
+             this.m_21231_().m_19289_(p_21240_, f1, f2);
++            this.m_21153_(f1 - f2); // Forge: moved to fix MC-121048
+             this.m_7911_(this.m_6103_() - f2);
+             this.m_146852_(GameEvent.f_157808_, p_21240_.m_7639_());
+          }
+@@ -1601,6 +_,8 @@
+    }
+ 
+    public void m_21011_(InteractionHand p_21012_, boolean p_21013_) {
++      ItemStack stack = this.m_21120_(p_21012_);
++      if (!stack.m_41619_() && stack.onEntitySwing(this)) return;
+       if (!this.f_20911_ || this.f_20913_ >= this.m_21304_() / 2 || this.f_20913_ < 0) {
+          this.f_20913_ = -1;
+          this.f_20911_ = true;
+@@ -1965,14 +_,15 @@
+       }
+ 
+       this.f_19812_ = true;
++      net.minecraftforge.common.ForgeHooks.onLivingJump(this);
+    }
+ 
+    protected void m_21208_() {
+-      this.m_20256_(this.m_20184_().m_82520_(0.0D, (double)-0.04F, 0.0D));
++      this.m_20256_(this.m_20184_().m_82520_(0.0D, (double)-0.04F * this.m_21051_(net.minecraftforge.common.ForgeMod.SWIM_SPEED.get()).m_22135_(), 0.0D));
+    }
+ 
+    protected void m_203347_(TagKey<Fluid> p_204043_) {
+-      this.m_20256_(this.m_20184_().m_82520_(0.0D, (double)0.04F, 0.0D));
++      this.m_20256_(this.m_20184_().m_82520_(0.0D, (double)0.04F * this.m_21051_(net.minecraftforge.common.ForgeMod.SWIM_SPEED.get()).m_22135_(), 0.0D));
+    }
+ 
+    protected float m_6108_() {
+@@ -1986,13 +_,17 @@
+    public void m_7023_(Vec3 p_21280_) {
+       if (this.m_6142_() || this.m_6109_()) {
+          double d0 = 0.08D;
++         AttributeInstance gravity = this.m_21051_(net.minecraftforge.common.ForgeMod.ENTITY_GRAVITY.get());
+          boolean flag = this.m_20184_().f_82480_ <= 0.0D;
+          if (flag && (this.m_21023_(MobEffects.f_19591_) || this instanceof Player && this.m_146862_((p_213591_) -> {
+             return p_213591_.m_6095_() == EntityType.f_20555_;
+          }))) {
+-            d0 = 0.01D;
++            if (!gravity.m_22109_(SLOW_FALLING)) gravity.m_22118_(SLOW_FALLING);
+             this.m_183634_();
++         } else if (gravity.m_22109_(SLOW_FALLING)) {
++            gravity.m_22130_(SLOW_FALLING);
+          }
++         d0 = gravity.m_22135_();
+ 
+          if (this instanceof Player && this.m_146862_((p_213589_) -> {
+             return p_213589_.m_6095_() == EntityType.f_20550_;
+@@ -2023,6 +_,7 @@
+                f4 = 0.96F;
+             }
+ 
++            f5 *= (float)this.m_21051_(net.minecraftforge.common.ForgeMod.SWIM_SPEED.get()).m_22135_();
+             this.m_19920_(f5, p_21280_);
+             this.m_6478_(MoverType.SELF, this.m_20184_());
+             Vec3 vec36 = this.m_20184_();
+@@ -2101,7 +_,7 @@
+             }
+          } else {
+             BlockPos blockpos = this.m_20099_();
+-            float f2 = this.f_19853_.m_8055_(blockpos).m_60734_().m_49958_();
++            float f2 = this.f_19853_.m_8055_(this.m_20099_()).getFriction(f_19853_, this.m_20099_(), this);
+             float f3 = this.f_19861_ ? f2 * 0.91F : 0.91F;
+             Vec3 vec35 = this.m_21074_(p_21280_, f2);
+             double d2 = vec35.f_82480_;
+@@ -2177,7 +_,7 @@
+          double d0 = Mth.m_14008_(p_21298_.f_82479_, (double)-0.15F, (double)0.15F);
+          double d1 = Mth.m_14008_(p_21298_.f_82481_, (double)-0.15F, (double)0.15F);
+          double d2 = Math.max(p_21298_.f_82480_, (double)-0.15F);
+-         if (d2 < 0.0D && !this.m_146900_().m_60713_(Blocks.f_50616_) && this.m_5791_() && this instanceof Player) {
++         if (d2 < 0.0D && !this.m_146900_().isScaffolding(this) && this.m_5791_() && this instanceof Player) {
+             d2 = 0.0D;
+          }
+ 
+@@ -2205,6 +_,7 @@
+    }
+ 
+    public void m_8119_() {
++      if (net.minecraftforge.common.ForgeHooks.onLivingUpdate(this)) return;
+       super.m_8119_();
+       this.m_21329_();
+       this.m_21333_();
+@@ -2357,6 +_,7 @@
+ 
+          ItemStack itemstack1 = this.m_6844_(equipmentslot);
+          if (!ItemStack.m_41728_(itemstack1, itemstack)) {
++            net.minecraftforge.common.MinecraftForge.EVENT_BUS.post(new net.minecraftforge.event.entity.living.LivingEquipmentChangeEvent(this, equipmentslot, itemstack, itemstack1));
+             if (map == null) {
+                map = Maps.newEnumMap(EquipmentSlot.class);
+             }
+@@ -2580,6 +_,8 @@
+       boolean flag = this.m_20291_(7);
+       if (flag && !this.f_19861_ && !this.m_20159_() && !this.m_21023_(MobEffects.f_19620_)) {
+          ItemStack itemstack = this.m_6844_(EquipmentSlot.CHEST);
++         flag = itemstack.canElytraFly(this) && itemstack.elytraFlightTick(this, this.f_20937_);
++         if (false) //Forge: Moved to ElytraItem
+          if (itemstack.m_150930_(Items.f_42741_) && ElytraItem.m_41140_(itemstack)) {
+             flag = true;
+             int i = this.f_20937_ + 1;
+@@ -2811,8 +_,16 @@
+ 
+    private void m_21329_() {
+       if (this.m_6117_()) {
+-         if (ItemStack.m_41758_(this.m_21120_(this.m_7655_()), this.f_20935_)) {
+-            this.f_20935_ = this.m_21120_(this.m_7655_());
++         ItemStack itemStack = this.m_21120_(this.m_7655_());
++         if (net.minecraftforge.common.ForgeHooks.canContinueUsing(this.f_20935_, itemStack)) this.f_20935_ = itemStack;
++         if (itemStack == this.f_20935_) {
++
++            if (!this.f_20935_.m_41619_()) {
++              f_20936_ = net.minecraftforge.event.ForgeEventFactory.onItemUseTick(this, f_20935_, f_20936_);
++              if (f_20936_ > 0)
++                 f_20935_.onUsingTick(this, f_20936_);
 +            }
-             if (blockstate.is(BlockTags.CLIMBABLE)) {
-                 this.lastClimbablePos = Optional.of(blockpos);
-                 return true;
-@@ -1636,6 +_,10 @@
- 
-     @Override
-     public boolean causeFallDamage(float p_147187_, float p_147188_, DamageSource p_147189_) {
-+        var event = net.minecraftforge.event.ForgeEventFactory.onLivingFall(this, p_147187_, p_147188_);
-+        if (event.isCanceled()) return false;
-+        p_147187_ = event.getDistance();
-+        p_147188_ = event.getDamageMultiplier();
-         boolean flag = super.causeFallDamage(p_147187_, p_147188_, p_147189_);
-         int i = this.calculateFallDamage(p_147187_, p_147188_);
-         if (i > 0) {
-@@ -1663,9 +_,10 @@
-             int i = Mth.floor(this.getX());
-             int j = Mth.floor(this.getY() - 0.2F);
-             int k = Mth.floor(this.getZ());
--            BlockState blockstate = this.level().getBlockState(new BlockPos(i, j, k));
-+            BlockPos pos = new BlockPos(i, j, k);
-+            BlockState blockstate = this.level().getBlockState(pos);
-             if (!blockstate.isAir()) {
--                SoundType soundtype = blockstate.getSoundType();
-+                SoundType soundtype = blockstate.getSoundType(level(), pos, this);
-                 this.playSound(soundtype.getFallSound(), soundtype.getVolume() * 0.5F, soundtype.getPitch() * 0.75F);
-             }
-         }
-@@ -1726,9 +_,9 @@
-                 float f2 = f1 - p_21194_;
-                 if (f2 > 0.0F && f2 < 3.4028235E37F) {
-                     if (this instanceof ServerPlayer) {
--                        ((ServerPlayer)this).awardStat(Stats.DAMAGE_RESISTED, Math.round(f2 * 10.0F));
-+                        ((ServerPlayer)this).awardStat(Stats.CUSTOM.get(Stats.DAMAGE_RESISTED), Math.round(f2 * 10.0F));
-                     } else if (p_21193_.getEntity() instanceof ServerPlayer) {
--                        ((ServerPlayer)p_21193_.getEntity()).awardStat(Stats.DAMAGE_DEALT_RESISTED, Math.round(f2 * 10.0F));
-+                        ((ServerPlayer)p_21193_.getEntity()).awardStat(Stats.CUSTOM.get(Stats.DAMAGE_DEALT_RESISTED), Math.round(f2 * 10.0F));
-                     }
-                 }
-             }
-@@ -1756,6 +_,8 @@
- 
-     protected void actuallyHurt(ServerLevel p_365124_, DamageSource p_21240_, float p_21241_) {
-         if (!this.isInvulnerableTo(p_365124_, p_21240_)) {
-+            p_21241_ = net.minecraftforge.common.ForgeHooks.onLivingHurt(this, p_21240_, p_21241_);
-+            if (p_21241_ <= 0) return;
-             p_21241_ = this.getDamageAfterArmorAbsorb(p_21240_, p_21241_);
-             p_21241_ = this.getDamageAfterMagicAbsorb(p_21240_, p_21241_);
-             float f1 = Math.max(p_21241_ - this.getAbsorptionAmount(), 0.0F);
-@@ -1765,6 +_,7 @@
-                 serverplayer.awardStat(Stats.DAMAGE_DEALT_ABSORBED, Math.round(f * 10.0F));
-             }
- 
-+            f1 = net.minecraftforge.common.ForgeHooks.onLivingDamage(this, p_21240_, f1);
-             if (f1 != 0.0F) {
-                 this.getCombatTracker().recordDamage(p_21240_, f1);
-                 this.setHealth(this.getHealth() - f1);
-@@ -1824,6 +_,8 @@
-     }
- 
-     public void swing(InteractionHand p_21012_, boolean p_21013_) {
-+        ItemStack stack = this.getItemInHand(p_21012_);
-+        if (!stack.isEmpty() && stack.onEntitySwing(this)) return;
-         if (!this.swinging || this.swingTime >= this.getCurrentSwingDuration() / 2 || this.swingTime < 0) {
-             this.swingTime = -1;
-             this.swinging = true;
-@@ -1936,9 +_,10 @@
-     }
- 
-     private void swapHandItems() {
--        ItemStack itemstack = this.getItemBySlot(EquipmentSlot.OFFHAND);
--        this.setItemSlot(EquipmentSlot.OFFHAND, this.getItemBySlot(EquipmentSlot.MAINHAND));
--        this.setItemSlot(EquipmentSlot.MAINHAND, itemstack);
-+        var event = net.minecraftforge.event.ForgeEventFactory.onLivingSwapHandItems(this);
-+        if (event.isCanceled()) return;
-+        this.setItemSlot(EquipmentSlot.OFFHAND, event.getItemSwappedToOffHand());
-+        this.setItemSlot(EquipmentSlot.MAINHAND, event.getItemSwappedToMainHand());
-     }
- 
-     @Override
-@@ -2156,15 +_,18 @@
-             }
- 
-             this.hasImpulse = true;
-+            net.minecraftforge.common.ForgeHooks.onLivingJump(this);
-         }
-     }
- 
-+    @Deprecated // FORGE: use sinkInFluid instead
-     protected void goDownInWater() {
--        this.setDeltaMovement(this.getDeltaMovement().add(0.0, -0.04F, 0.0));
-+        this.sinkInFluid(net.minecraftforge.common.ForgeMod.WATER_TYPE.get());
-     }
- 
-+    @Deprecated // FORGE: use jumpInFluid instead
-     protected void jumpInLiquid(TagKey<Fluid> p_204043_) {
--        this.setDeltaMovement(this.getDeltaMovement().add(0.0, 0.04F, 0.0));
-+        this.setDeltaMovement(this.getDeltaMovement().add(0.0, 0.04F * this.getAttributeValue(net.minecraftforge.common.ForgeMod.SWIM_SPEED.getHolder().get()), 0.0));
-     }
- 
-     protected float getWaterSlowDown() {
-@@ -2188,8 +_,8 @@
-     public void travel(Vec3 p_21280_) {
-         if (this.isControlledByLocalInstance()) {
-             FluidState fluidstate = this.level().getFluidState(this.blockPosition());
--            if ((this.isInWater() || this.isInLava()) && this.isAffectedByFluids() && !this.canStandOnFluid(fluidstate)) {
--                this.travelInFluid(p_21280_);
-+            if ((this.isInWater() || this.isInLava() || this.isInFluidType(fluidstate)) && this.isAffectedByFluids() && !this.canStandOnFluid(fluidstate)) {
-+                this.travelInFluid(p_21280_, fluidstate);
-             } else if (this.isFallFlying()) {
-                 this.travelFallFlying();
-             } else {
-@@ -2200,7 +_,7 @@
- 
-     private void travelInAir(Vec3 p_362087_) {
-         BlockPos blockpos = this.getBlockPosBelowThatAffectsMyMovement();
--        float f = this.onGround() ? this.level().getBlockState(blockpos).getBlock().getFriction() : 1.0F;
-+        float f = this.onGround() ? this.level().getBlockState(blockpos).getFriction(level(), blockpos, this) : 1.0F;
-         float f1 = f * 0.91F;
-         Vec3 vec3 = this.handleRelativeFrictionAndCalculateMovement(p_362087_, f);
-         double d0 = vec3.y;
-@@ -2223,10 +_,18 @@
-         }
-     }
- 
--    private void travelInFluid(Vec3 p_362114_) {
-+    @Deprecated // FORGE: Use the version that takes a FluidState
-+    private void travelInFluid(Vec3 p_365480_) {
-+        this.travelInFluid(p_365480_, net.minecraft.world.level.material.Fluids.WATER.defaultFluidState());
-+    }
 +
-+    private void travelInFluid(Vec3 p_362114_, FluidState fluidstate) {
-         boolean flag = this.getDeltaMovement().y <= 0.0;
-         double d0 = this.getY();
-         double d1 = this.getEffectiveGravity();
-+        if (this.isInFluidType(fluidstate) && this.moveInFluid(fluidstate, p_362114_, d0)) {
-+            // Modded fluid handled it
-+        } else
-         if (this.isInWater()) {
-             float f = this.isSprinting() ? 0.9F : this.getWaterSlowDown();
-             float f1 = 0.02F;
-@@ -2244,6 +_,7 @@
-                 f = 0.96F;
-             }
+             this.m_142106_(this.f_20935_);
+          } else {
+             this.m_5810_();
+@@ -2865,8 +_,10 @@
+    public void m_6672_(InteractionHand p_21159_) {
+       ItemStack itemstack = this.m_21120_(p_21159_);
+       if (!itemstack.m_41619_() && !this.m_6117_()) {
++         int duration = net.minecraftforge.event.ForgeEventFactory.onItemUseStart(this, itemstack, itemstack.m_41779_());
++         if (duration <= 0) return;
+          this.f_20935_ = itemstack;
+-         this.f_20936_ = itemstack.m_41779_();
++         this.f_20936_ = duration;
+          if (!this.f_19853_.f_46443_) {
+             this.m_21155_(1, true);
+             this.m_21155_(2, p_21159_ == InteractionHand.OFF_HAND);
+@@ -2926,6 +_,9 @@
+          vec31 = vec31.m_82496_(-this.m_146909_() * ((float)Math.PI / 180F));
+          vec31 = vec31.m_82524_(-this.m_146908_() * ((float)Math.PI / 180F));
+          vec31 = vec31.m_82520_(this.m_20185_(), this.m_20188_(), this.m_20189_());
++         if (this.f_19853_ instanceof ServerLevel) //Forge: Fix MC-2518 spawnParticle is nooped on server, need to use server specific variant
++             ((ServerLevel)this.f_19853_).m_8767_(new ItemParticleOption(ParticleTypes.f_123752_, p_21061_), vec31.f_82479_, vec31.f_82480_, vec31.f_82481_, 1, vec3.f_82479_, vec3.f_82480_ + 0.05D, vec3.f_82481_, 0.0D);
++         else
+          this.f_19853_.m_7106_(new ItemParticleOption(ParticleTypes.f_123752_, p_21061_), vec31.f_82479_, vec31.f_82480_, vec31.f_82481_, vec3.f_82479_, vec3.f_82480_ + 0.05D, vec3.f_82481_);
+       }
  
-+                f1 *= this.getAttributeValue(net.minecraftforge.common.ForgeMod.SWIM_SPEED.getHolder().get());
-             this.moveRelative(f1, p_362114_);
-             this.move(MoverType.SELF, this.getDeltaMovement());
-             Vec3 vec3 = this.getDeltaMovement();
-@@ -2392,7 +_,7 @@
-             double d0 = Mth.clamp(p_21298_.x, -0.15F, 0.15F);
-             double d1 = Mth.clamp(p_21298_.z, -0.15F, 0.15F);
-             double d2 = Math.max(p_21298_.y, -0.15F);
--            if (d2 < 0.0 && !this.getInBlockState().is(Blocks.SCAFFOLDING) && this.isSuppressingSlidingDownLadder() && this instanceof Player) {
-+            if (d2 < 0.0 && !this.getInBlockState().isScaffolding(this) && this.isSuppressingSlidingDownLadder() && this instanceof Player) {
-                 d2 = 0.0;
-             }
+@@ -2940,7 +_,8 @@
+          } else {
+             if (!this.f_20935_.m_41619_() && this.m_6117_()) {
+                this.m_21137_(this.f_20935_, 16);
+-               ItemStack itemstack = this.f_20935_.m_41671_(this.f_19853_, this);
++            ItemStack copy = this.f_20935_.m_41777_();
++            ItemStack itemstack = net.minecraftforge.event.ForgeEventFactory.onItemUseFinish(this, copy, m_21212_(), this.f_20935_.m_41671_(this.f_19853_, this));
+                if (itemstack != this.f_20935_) {
+                   this.m_21008_(interactionhand, itemstack);
+                }
+@@ -2966,7 +_,11 @@
  
-@@ -2425,6 +_,7 @@
+    public void m_21253_() {
+       if (!this.f_20935_.m_41619_()) {
++         if (!net.minecraftforge.event.ForgeEventFactory.onUseItemStop(this, f_20935_, this.m_21212_())) {
++            ItemStack copy = this instanceof Player ? f_20935_.m_41777_() : null;
+          this.f_20935_.m_41674_(this.f_19853_, this, this.m_21212_());
++           if (copy != null && f_20935_.m_41619_()) net.minecraftforge.event.ForgeEventFactory.onPlayerDestroyItem((Player)this, copy, m_7655_());
++         }
+          if (this.f_20935_.m_41781_()) {
+             this.m_21329_();
+          }
+@@ -3113,8 +_,8 @@
+       }
  
-     @Override
-     public void tick() {
-+        if (net.minecraftforge.event.ForgeEventFactory.onLivingTick(this)) return;
-         super.tick();
-         this.updatingUsingItem();
-         this.updateSwimAmount();
-@@ -2577,6 +_,7 @@
-             };
-             ItemStack itemstack1 = this.getItemBySlot(equipmentslot);
-             if (this.equipmentHasChanged(itemstack, itemstack1)) {
-+                net.minecraftforge.event.ForgeEventFactory.onLivingEquipmentChange(this, equipmentslot, itemstack, itemstack1);
-                 if (map == null) {
-                     map = Maps.newEnumMap(EquipmentSlot.class);
-                 }
-@@ -2736,6 +_,10 @@
-         profilerfiller.push("jump");
-         if (this.jumping && this.isAffectedByFluids()) {
-             double d3;
-+            var fluidType = this.getMaxHeightFluidType();
-+            if (!fluidType.isAir()) {
-+                d3 = this.getFluidTypeHeight(fluidType);
-+            } else
-             if (this.isInLava()) {
-                 d3 = this.getFluidHeight(FluidTags.LAVA);
-             } else {
-@@ -2746,15 +_,22 @@
-             double d4 = this.getFluidJumpThreshold();
-             if (!flag || this.onGround() && !(d3 > d4)) {
-                 if (!this.isInLava() || this.onGround() && !(d3 > d4)) {
-+                    if (fluidType.isAir() || this.onGround() && !(d3 > d4)) {
-                     if ((this.onGround() || flag && d3 <= d4) && this.noJumpDelay == 0) {
-                         this.jumpFromGround();
-                         this.noJumpDelay = 10;
-                     }
-+                    } else {
-+                        this.jumpInFluid(fluidType);
-+                    }
-                 } else {
--                    this.jumpInLiquid(FluidTags.LAVA);
-+                    var old = this.getDeltaMovement();
-+                    this.jumpInFluid(net.minecraftforge.common.ForgeMod.LAVA_TYPE.get());
-+                    if (this instanceof Player)
-+                        System.out.println(old + " " + this.getDeltaMovement());
-                 }
-             } else {
--                this.jumpInLiquid(FluidTags.WATER);
-+                this.jumpInFluid(net.minecraftforge.common.ForgeMod.WATER_TYPE.get());
-             }
-         } else {
-             this.noJumpDelay = 0;
-@@ -3104,8 +_,11 @@
+       BlockState blockstate = this.f_19853_.m_8055_(p_21141_);
+-      if (blockstate.m_60734_() instanceof BedBlock) {
+-         this.f_19853_.m_7731_(p_21141_, blockstate.m_61124_(BedBlock.f_49441_, Boolean.valueOf(true)), 3);
++      if (blockstate.isBed(f_19853_, p_21141_, this)) {
++         blockstate.setBedOccupied(f_19853_, p_21141_, this, true);
+       }
  
-     private void updatingUsingItem() {
-         if (this.isUsingItem()) {
--            if (ItemStack.isSameItem(this.getItemInHand(this.getUsedItemHand()), this.useItem)) {
-+            var current = this.getItemInHand(this.getUsedItemHand());
-+            if (net.minecraftforge.common.ForgeHooks.canContinueUsing(this.useItem, current)) {
-                 this.useItem = this.getItemInHand(this.getUsedItemHand());
-+            }
-+            if (this.useItem == current) {
-                 this.updateUsingItem(this.useItem);
-             } else {
-                 this.stopUsingItem();
-@@ -3114,8 +_,12 @@
-     }
+       this.m_20124_(Pose.SLEEPING);
+@@ -3130,15 +_,15 @@
  
-     protected void updateUsingItem(ItemStack p_147201_) {
-+        if (!p_147201_.isEmpty()) {
-+            this.useItemRemaining = net.minecraftforge.event.ForgeEventFactory.onItemUseTick(this, p_147201_, this.getUseItemRemainingTicks());
-+        }
-+        if (this.getUseItemRemainingTicks() > 0)
-         p_147201_.onUseTick(this.level(), this, this.getUseItemRemainingTicks());
--        if (--this.useItemRemaining == 0 && !this.level().isClientSide && !p_147201_.useOnRelease()) {
-+        if (--this.useItemRemaining <= 0 && !this.level().isClientSide && !p_147201_.useOnRelease()) {
-             this.completeUsingItem();
-         }
-     }
-@@ -3143,8 +_,10 @@
-     public void startUsingItem(InteractionHand p_21159_) {
-         ItemStack itemstack = this.getItemInHand(p_21159_);
-         if (!itemstack.isEmpty() && !this.isUsingItem()) {
-+            int duration = net.minecraftforge.event.ForgeEventFactory.onItemUseStart(this, itemstack, itemstack.getUseDuration(this));
-+            if (duration < 0) return;
-             this.useItem = itemstack;
--            this.useItemRemaining = itemstack.getUseDuration(this);
-+            this.useItemRemaining = duration;
-             if (!this.level().isClientSide) {
-                 this.setLivingEntityFlag(1, true);
-                 this.setLivingEntityFlag(2, p_21159_ == InteractionHand.OFF_HAND);
-@@ -3196,6 +_,9 @@
-             vec31 = vec31.xRot(-this.getXRot() * (float) (Math.PI / 180.0));
-             vec31 = vec31.yRot(-this.getYRot() * (float) (Math.PI / 180.0));
-             vec31 = vec31.add(this.getX(), this.getEyeY(), this.getZ());
-+            if (this.level() instanceof ServerLevel serverLevel) //Forge: Fix MC-2518 spawnParticle is nooped on server, need to use server specific variant
-+                serverLevel.sendParticles(new ItemParticleOption(ParticleTypes.ITEM, p_21061_), vec31.x, vec31.y, vec31.z, 1, vec3.x, vec3.y + 0.05D, vec3.z, 0.0D);
-+            else
-             this.level()
-                 .addParticle(
-                     new ItemParticleOption(ParticleTypes.ITEM, p_21061_),
-@@ -3216,7 +_,9 @@
-                 this.releaseUsingItem();
-             } else {
-                 if (!this.useItem.isEmpty() && this.isUsingItem()) {
-+                    ItemStack copy = this.useItem.copy();
-                     ItemStack itemstack = this.useItem.finishUsingItem(this.level(), this);
-+                    itemstack = net.minecraftforge.event.ForgeEventFactory.onItemUseFinish(this, copy, getUseItemRemainingTicks(), itemstack);
-                     if (itemstack != this.useItem) {
-                         this.setItemInHand(interactionhand, itemstack);
-                     }
-@@ -3244,7 +_,13 @@
+    private boolean m_21334_() {
+       return this.m_21257_().map((p_213611_) -> {
+-         return this.f_19853_.m_8055_(p_213611_).m_60734_() instanceof BedBlock;
++         return net.minecraftforge.event.ForgeEventFactory.fireSleepingLocationCheck(this, p_213611_);
+       }).orElse(false);
+    }
  
-     public void releaseUsingItem() {
-         if (!this.useItem.isEmpty()) {
-+            if (!net.minecraftforge.event.ForgeEventFactory.onUseItemStop(this, useItem, this.getUseItemRemainingTicks())) {
-+               ItemStack copy = this instanceof Player ? useItem.copy() : null;
-             this.useItem.releaseUsing(this.level(), this, this.getUseItemRemainingTicks());
-+               if (copy != null && useItem.isEmpty()) {
-+                   net.minecraftforge.event.ForgeEventFactory.onPlayerDestroyItem((Player)this, copy, getUsedItemHand());
-+               }
-+            }
-             if (this.useItem.useOnRelease()) {
-                 this.updatingUsingItem();
-             }
-@@ -3254,6 +_,7 @@
-     }
+    public void m_5796_() {
+       this.m_21257_().filter(this.f_19853_::m_46805_).ifPresent((p_213601_) -> {
+          BlockState blockstate = this.f_19853_.m_8055_(p_213601_);
+-         if (blockstate.m_60734_() instanceof BedBlock) {
+-            this.f_19853_.m_7731_(p_213601_, blockstate.m_61124_(BedBlock.f_49441_, Boolean.valueOf(false)), 3);
++         if (blockstate.isBed(f_19853_, p_213601_, this)) {
++            blockstate.setBedOccupied(f_19853_, p_213601_, this, false);
+             Vec3 vec31 = BedBlock.m_49458_(this.m_6095_(), this.f_19853_, p_213601_, this.m_146908_()).orElseGet(() -> {
+                BlockPos blockpos = p_213601_.m_7494_();
+                return new Vec3((double)blockpos.m_123341_() + 0.5D, (double)blockpos.m_123342_() + 0.1D, (double)blockpos.m_123343_() + 0.5D);
+@@ -3160,7 +_,9 @@
+    @Nullable
+    public Direction m_21259_() {
+       BlockPos blockpos = this.m_21257_().orElse((BlockPos)null);
+-      return blockpos != null ? BedBlock.m_49485_(this.f_19853_, blockpos) : null;
++      if (blockpos == null) return Direction.UP;
++      BlockState state = this.f_19853_.m_8055_(blockpos);
++      return !state.isBed(f_19853_, blockpos, this) ? Direction.UP : state.getBedDirection(f_19853_, blockpos);
+    }
  
-     public void stopUsingItem() {
-+        if (this.isUsingItem() && !this.useItem.isEmpty()) this.useItem.onStopUsing(this, useItemRemaining);
-         if (!this.level().isClientSide) {
-             boolean flag = this.isUsingItem();
-             this.setLivingEntityFlag(1, false);
-@@ -3274,7 +_,8 @@
-     public ItemStack getItemBlockingWith() {
-         if (this.isUsingItem() && !this.useItem.isEmpty()) {
-             Item item = this.useItem.getItem();
--            if (item.getUseAnimation(this.useItem) != ItemUseAnimation.BLOCK) {
-+            boolean canBlock = this.useItem.canPerformAction(net.minecraftforge.common.ToolActions.SHIELD_BLOCK);
-+            if (!canBlock) {
-                 return null;
-             } else {
-                 return item.getUseDuration(this.useItem, this) - this.useItemRemaining < 5 ? null : this.useItem;
-@@ -3419,8 +_,8 @@
-         }
+    public boolean m_5830_() {
+@@ -3176,7 +_,7 @@
+    }
  
-         BlockState blockstate = this.level().getBlockState(p_21141_);
--        if (blockstate.getBlock() instanceof BedBlock) {
--            this.level().setBlock(p_21141_, blockstate.setValue(BedBlock.OCCUPIED, Boolean.valueOf(true)), 3);
-+        if (blockstate.isBed(level(), p_21141_, this)) {
-+            blockstate.setBedOccupied(level(), p_21141_, this, true);
-         }
+    public ItemStack m_6298_(ItemStack p_21272_) {
+-      return ItemStack.f_41583_;
++      return net.minecraftforge.common.ForgeHooks.getProjectile(this, p_21272_, ItemStack.f_41583_);
+    }
  
-         this.setPose(Pose.SLEEPING);
-@@ -3435,15 +_,15 @@
-     }
+    public ItemStack m_5584_(Level p_21067_, ItemStack p_21068_) {
+@@ -3233,6 +_,64 @@
+       this.m_21166_(p_21191_ == InteractionHand.MAIN_HAND ? EquipmentSlot.MAINHAND : EquipmentSlot.OFFHAND);
+    }
  
-     private boolean checkBedExists() {
--        return this.getSleepingPos().map(p_374931_ -> this.level().getBlockState(p_374931_).getBlock() instanceof BedBlock).orElse(false);
-+        return this.getSleepingPos().map(p_341272_ -> net.minecraftforge.event.ForgeEventFactory.fireSleepingLocationCheck(this, p_341272_)).orElse(false);
-     }
- 
-     public void stopSleeping() {
-         this.getSleepingPos().filter(this.level()::hasChunkAt).ifPresent(p_261435_ -> {
-             BlockState blockstate = this.level().getBlockState(p_261435_);
--            if (blockstate.getBlock() instanceof BedBlock) {
-+            if (blockstate.isBed(level(), p_261435_, this)) {
-                 Direction direction = blockstate.getValue(BedBlock.FACING);
--                this.level().setBlock(p_261435_, blockstate.setValue(BedBlock.OCCUPIED, Boolean.valueOf(false)), 3);
-+                blockstate.setBedOccupied(level(), p_261435_, this, false);
-                 Vec3 vec31 = BedBlock.findStandUpPosition(this.getType(), this.level(), p_261435_, direction, this.getYRot()).orElseGet(() -> {
-                     BlockPos blockpos = p_261435_.above();
-                     return new Vec3((double)blockpos.getX() + 0.5, (double)blockpos.getY() + 0.1, (double)blockpos.getZ() + 0.5);
-@@ -3464,7 +_,9 @@
-     @Nullable
-     public Direction getBedOrientation() {
-         BlockPos blockpos = this.getSleepingPos().orElse(null);
--        return blockpos != null ? BedBlock.getBedOrientation(this.level(), blockpos) : null;
-+        if (blockpos == null) return Direction.UP;
-+        BlockState state = this.level().getBlockState(blockpos);
-+        return !state.isBed(level(), blockpos, this) ? Direction.UP : state.getBedDirection(level(), blockpos);
-     }
- 
-     @Override
-@@ -3473,7 +_,7 @@
-     }
- 
-     public ItemStack getProjectile(ItemStack p_21272_) {
--        return ItemStack.EMPTY;
-+        return net.minecraftforge.common.ForgeHooks.getProjectile(this, p_21272_, ItemStack.EMPTY);
-     }
- 
-     private static byte entityEventForEquipmentBreak(EquipmentSlot p_21267_) {
-@@ -3528,6 +_,8 @@
-     }
- 
-     public final EquipmentSlot getEquipmentSlotForItem(ItemStack p_147234_) {
-+        final EquipmentSlot slot = p_147234_.getEquipmentSlot();
-+        if (slot != null) return slot; // FORGE: Allow modders to set a non-default equipment slot for a stack; e.g. a non-armor chestplate-slot item
-         Equippable equippable = p_147234_.get(DataComponents.EQUIPPABLE);
-         return equippable != null && this.canUseSlot(equippable.slot()) ? equippable.slot() : EquipmentSlot.MAINHAND;
-     }
-@@ -3659,5 +_,42 @@
-     }
- 
-     public static record Fallsounds(SoundEvent small, SoundEvent big) {
-+    }
++   /* ==== FORGE START ==== */
++   /***
++    * Removes all potion effects that have curativeItem as a curative item for its effect
++    * @param curativeItem The itemstack we are using to cure potion effects
++    */
++   public boolean curePotionEffects(ItemStack curativeItem) {
++      if (this.f_19853_.f_46443_)
++         return false;
++      boolean ret = false;
++      Iterator<MobEffectInstance> itr = this.f_20945_.values().iterator();
++      while (itr.hasNext()) {
++         MobEffectInstance effect = itr.next();
++         if (effect.isCurativeItem(curativeItem) && !net.minecraftforge.common.MinecraftForge.EVENT_BUS.post(new net.minecraftforge.event.entity.living.PotionEvent.PotionRemoveEvent(this, effect))) {
++            this.m_7285_(effect);
++            itr.remove();
++            ret = true;
++            this.f_20948_ = true;
++         }
++      }
++      return ret;
++   }
 +
-+    /**
-+     * Returns true if the entity's rider (EntityPlayer) should face forward when mounted.
-+     * currently only used in vanilla code by pigs.
-+     *
-+     * @param player The player who is riding the entity.
-+     * @return If the player should orient the same direction as this entity.
-+     */
-+    public boolean shouldRiderFaceForward(Player player) {
-+        return this instanceof net.minecraft.world.entity.animal.Pig;
-+    }
++   /**
++    * Returns true if the entity's rider (EntityPlayer) should face forward when mounted.
++    * currently only used in vanilla code by pigs.
++    *
++    * @param player The player who is riding the entity.
++    * @return If the player should orient the same direction as this entity.
++    */
++   public boolean shouldRiderFaceForward(Player player) {
++      return this instanceof net.minecraft.world.entity.animal.Pig;
++   }
 +
-+    private net.minecraftforge.common.util.LazyOptional<?>[] handlers = net.minecraftforge.items.wrapper.EntityEquipmentInvWrapper.create(this);
++   private net.minecraftforge.common.util.LazyOptional<?>[] handlers = net.minecraftforge.items.wrapper.EntityEquipmentInvWrapper.create(this);
 +
-+    @Override
-+    public <T> net.minecraftforge.common.util.LazyOptional<T> getCapability(net.minecraftforge.common.capabilities.Capability<T> capability, @Nullable Direction facing) {
-+        if (capability == net.minecraftforge.common.capabilities.ForgeCapabilities.ITEM_HANDLER && this.isAlive()) {
-+             if (facing == null) return handlers[2].cast();
-+             else if (facing.getAxis().isVertical()) return handlers[0].cast();
-+             else if (facing.getAxis().isHorizontal()) return handlers[1].cast();
-+        }
-+        return super.getCapability(capability, facing);
-+    }
++   @Override
++   public <T> net.minecraftforge.common.util.LazyOptional<T> getCapability(net.minecraftforge.common.capabilities.Capability<T> capability, @Nullable Direction facing) {
++      if (this.m_6084_() && capability == net.minecraftforge.items.CapabilityItemHandler.ITEM_HANDLER_CAPABILITY) {
++         if (facing == null) return handlers[2].cast();
++         else if (facing.m_122434_().m_122478_()) return handlers[0].cast();
++         else if (facing.m_122434_().m_122479_()) return handlers[1].cast();
++      }
++      return super.getCapability(capability, facing);
++   }
 +
-+    @Override
-+    public void invalidateCaps() {
-+        super.invalidateCaps();
-+        for (int x = 0; x < handlers.length; x++) {
-+             handlers[x].invalidate();
-+        }
-+    }
++   @Override
++   public void invalidateCaps() {
++      super.invalidateCaps();
++      for (int x = 0; x < handlers.length; x++)
++         handlers[x].invalidate();
++   }
 +
-+    @Override
-+    public void reviveCaps() {
-+        super.reviveCaps();
-+        handlers = net.minecraftforge.items.wrapper.EntityEquipmentInvWrapper.create(this);
-     }
- }
++   @Override
++   public void reviveCaps() {
++      super.reviveCaps();
++      handlers = net.minecraftforge.items.wrapper.EntityEquipmentInvWrapper.create(this);
++   }
++
+    public AABB m_6921_() {
+       if (this.m_6844_(EquipmentSlot.HEAD).m_150930_(Items.f_42683_)) {
+          float f = 0.5F;
+@@ -3243,6 +_,8 @@
+    }
+ 
+    public static EquipmentSlot m_147233_(ItemStack p_147234_) {
++      final EquipmentSlot slot = p_147234_.getEquipmentSlot();
++      if (slot != null) return slot; // FORGE: Allow modders to set a non-default equipment slot for a stack; e.g. a non-armor chestplate-slot item
+       Item item = p_147234_.m_41720_();
+       if (!p_147234_.m_150930_(Items.f_42047_) && (!(item instanceof BlockItem) || !(((BlockItem)item).m_40614_() instanceof AbstractSkullBlock))) {
+          if (item instanceof ArmorItem) {
+@@ -3250,7 +_,7 @@
+          } else if (p_147234_.m_150930_(Items.f_42741_)) {
+             return EquipmentSlot.CHEST;
+          } else {
+-            return p_147234_.m_150930_(Items.f_42740_) ? EquipmentSlot.OFFHAND : EquipmentSlot.MAINHAND;
++            return p_147234_.canPerformAction(net.minecraftforge.common.ToolActions.SHIELD_BLOCK) ? EquipmentSlot.OFFHAND : EquipmentSlot.MAINHAND;
+          }
+       } else {
+          return EquipmentSlot.HEAD;

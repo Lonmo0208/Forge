@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Forge Development LLC and contributors
+ * Minecraft Forge - Forge Development LLC
  * SPDX-License-Identifier: LGPL-2.1-only
  */
 
@@ -10,7 +10,8 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.core.BlockPos;
 import net.minecraftforge.eventbus.api.Cancelable;
-import org.jetbrains.annotations.Nullable;
+
+import javax.annotation.Nullable;
 
 /**
  * This event is fired when a player's spawn point is set or reset.<br>
@@ -19,15 +20,15 @@ import org.jetbrains.annotations.Nullable;
 @Cancelable
 public class PlayerSetSpawnEvent extends PlayerEvent
 {
-    private final ResourceKey<Level> spawnLevel;
+    private final ResourceKey<Level> spawnWorld;
     private final boolean forced;
     @Nullable
     private final BlockPos newSpawn;
-
-    public PlayerSetSpawnEvent(Player player, ResourceKey<Level> spawnLevel, @Nullable BlockPos newSpawn, boolean forced)
+    
+    public PlayerSetSpawnEvent(Player player, ResourceKey<Level> spawnWorld, @Nullable BlockPos newSpawn, boolean forced)
     {
         super(player);
-        this.spawnLevel = spawnLevel;
+        this.spawnWorld = spawnWorld;
         this.newSpawn = newSpawn;
         this.forced = forced;
     }
@@ -46,8 +47,8 @@ public class PlayerSetSpawnEvent extends PlayerEvent
         return newSpawn;
     }
 
-    public ResourceKey<Level> getSpawnLevel()
+    public ResourceKey<Level> getSpawnWorld()
     {
-        return spawnLevel;
+        return spawnWorld;
     }
 }

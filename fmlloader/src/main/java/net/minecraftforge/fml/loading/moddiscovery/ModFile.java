@@ -1,30 +1,41 @@
 /*
- * Copyright (c) Forge Development LLC and contributors
- * SPDX-License-Identifier: LGPL-2.1-only
+ * Minecraft Forge
+ * Copyright (c) 2016-2021.
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation version 2.1
+ * of the License.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
 package net.minecraftforge.fml.loading.moddiscovery;
 
 import com.google.common.collect.ImmutableMap;
-import com.mojang.logging.LogUtils;
 import cpw.mods.jarhandling.SecureJar;
 import net.minecraftforge.fml.loading.FMLLoader;
 import net.minecraftforge.fml.loading.LogMarkers;
+import net.minecraftforge.fml.loading.progress.StartupMessageManager;
 import net.minecraftforge.forgespi.language.IModFileInfo;
 import net.minecraftforge.forgespi.language.IModInfo;
 import net.minecraftforge.forgespi.language.IModLanguageProvider;
 import net.minecraftforge.forgespi.language.ModFileScanData;
 import net.minecraftforge.forgespi.locating.IModFile;
-import net.minecraftforge.forgespi.locating.IModProvider;
+import net.minecraftforge.forgespi.locating.IModLocator;
 import net.minecraftforge.forgespi.locating.ModFileFactory;
-import org.apache.maven.artifact.versioning.ArtifactVersion;
-import org.apache.maven.artifact.versioning.DefaultArtifactVersion;
-import org.slf4j.Logger;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -37,7 +48,16 @@ import java.util.jar.Attributes;
 import java.util.jar.Manifest;
 
 public class ModFile implements IModFile {
-    private static final Logger LOGGER = LogUtils.getLogger();
+    // Mods either must have a mods.toml or a manifest. We can no longer just put any jar on the classpath.
+    @Deprecated(forRemoval = true, since = "1.18")
+    public static final Manifest DEFAULTMANIFEST;
+    private static final Logger LOGGER = LogManager.getLogger();
+
+    static {
+        DEFAULTMANIFEST = new Manifest();
+        DEFAULTMANIFEST.getMainAttributes().putValue("FMLModType", "MOD");
+    }
+
     private final String jarVersion;
     private final ModFileFactory.ModFileInfoParser parser;
     private Map<String, Object> fileProperties;
@@ -45,8 +65,9 @@ public class ModFile implements IModFile {
     private Throwable scanError;
     private final SecureJar jar;
     private final Type modFileType;
-    private final IModProvider provider;
-    private       IModFileInfo modFileInfo;
+    private final Manifest manifest;
+    private final IModLocator locator;
+    private IModFileInfo modFileInfo;
     private ModFileScanData fileModFileScanData;
     private CompletableFuture<ModFileScanData> futureScanResult;
     private List<CoreModFile> coreMods;
@@ -55,19 +76,15 @@ public class ModFile implements IModFile {
     static final Attributes.Name TYPE = new Attributes.Name("FMLModType");
     private SecureJar.Status securityStatus;
 
-    public ModFile(final SecureJar jar, final IModProvider provider, final ModFileFactory.ModFileInfoParser parser) {
-        this(jar, provider, parser, parseType(jar));
-    }
-
-    public ModFile(final SecureJar jar, final IModProvider provider, final ModFileFactory.ModFileInfoParser parser, String type) {
-        this.provider = provider;
+    public ModFile(final SecureJar jar, final IModLocator locator, final ModFileFactory.ModFileInfoParser parser) {
+        this.locator = locator;
         this.jar = jar;
         this.parser = parser;
 
-        var manifest = this.jar.moduleDataProvider().getManifest();
-        modFileType = Type.valueOf(type);
+        manifest = this.jar.getManifest();
+        final Optional<String> value = Optional.ofNullable(manifest.getMainAttributes().getValue(TYPE));
+        modFileType = Type.valueOf(value.orElse("MOD"));
         jarVersion = Optional.ofNullable(manifest.getMainAttributes().getValue(Attributes.Name.IMPLEMENTATION_VERSION)).orElse("0.0NONE");
-        this.modFileInfo = ModFileParser.readModList(this, this.parser);
     }
 
     @Override
@@ -120,7 +137,7 @@ public class ModFile implements IModFile {
     }
 
     public void scanFile(Consumer<Path> pathConsumer) {
-        provider.scanFile(this, pathConsumer);
+        locator.scanFile(this, pathConsumer);
     }
 
     public void setFutureScanResult(CompletableFuture<ModFileScanData> future) {
@@ -148,6 +165,7 @@ public class ModFile implements IModFile {
         if (throwable != null) {
             this.scanError = throwable;
         }
+        StartupMessageManager.modLoaderConsumer().ifPresent(c->c.accept("Completed deep scan of "+this.getFileName()));
     }
 
     public void setFileProperties(Map<String, Object> fileProperties) {
@@ -168,13 +186,9 @@ public class ModFile implements IModFile {
     }
 
     public void identifyLanguage() {
-        var lst = new ArrayList<IModLanguageProvider>(this.modFileInfo.requiredLanguageLoaders().size());
-        var services = FMLLoader.getLanguageLoadingProvider();
-        for (var spec : this.modFileInfo.requiredLanguageLoaders()) {
-            var service = services.findLanguage(this, spec.languageName(), spec.acceptedVersions());
-            lst.add(service);
-        }
-        this.loaders = Collections.unmodifiableList(lst);
+        this.loaders = this.modFileInfo.requiredLanguageLoaders().stream()
+                .map(spec-> FMLLoader.getLanguageLoadingProvider().findLanguage(this, spec.languageName(), spec.acceptedVersions()))
+                .toList();
     }
 
     @Override
@@ -188,8 +202,8 @@ public class ModFile implements IModFile {
     }
 
     @Override
-    public IModProvider getProvider() {
-        return provider;
+    public IModLocator getLocator() {
+        return locator;
     }
 
     @Override
@@ -200,19 +214,5 @@ public class ModFile implements IModFile {
     @Override
     public void setSecurityStatus(final SecureJar.Status status) {
         this.securityStatus = status;
-    }
-
-    public SecureJar.Status getSecurityStatus() {
-        return this.securityStatus;
-    }
-
-    public ArtifactVersion getJarVersion() {
-        return new DefaultArtifactVersion(this.jarVersion);
-    }
-
-    private static String parseType(final SecureJar jar) {
-        final Manifest m = jar.moduleDataProvider().getManifest();
-        final Optional<String> value = Optional.ofNullable(m.getMainAttributes().getValue(TYPE));
-        return value.orElse("MOD");
     }
 }

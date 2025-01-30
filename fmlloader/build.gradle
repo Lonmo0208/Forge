@@ -1,126 +1,81 @@
-import net.minecraftforge.gradleutils.PomUtils
-
 plugins {
-    id 'java-library'
-    id 'maven-publish'
-    id 'net.minecraftforge.licenser'
-    id 'net.minecraftforge.gradleutils'
-    alias(libs.plugins.apt)
+    id 'com.github.ben-manes.versions'
+    id 'org.javamodularity.moduleplugin' version '1.8.3' apply false
 }
+apply plugin: 'java-library'
+apply plugin: 'jacoco'
+apply plugin: 'org.javamodularity.moduleplugin'
 
-apply from: rootProject.file('build_shared.gradle')
-
+dependencyUpdates.rejectVersionIf { isNonStable(it.candidate.version) }
 configurations.forEach{ it.transitive = false }
 
 dependencies {
-    compileOnly(libs.nulls)
-
-    api(libs.bundles.asm) // Needed by all the black magic
-    api(libs.forgespi)
-    api(libs.mergetool.api)
-    api(libs.log4j.api)
-    api(libs.slf4j.api)
-    api(libs.guava)
-    api(libs.gson)
-    api(libs.maven.artifact)
-    api(libs.apache.commons)
-    api(libs.bundles.night.config)
-    api(libs.modlauncher)
-    api(libs.coremods)
-    api(libs.mojang.logging)
-    api(libs.jarjar.selector)
-    api(libs.jarjar.meta)
-
-    implementation(libs.jopt.simple)
-    implementation(libs.securemodules)
-    implementation(libs.accesstransformers)
-    implementation(libs.terminalconsoleappender)
-    implementation(libs.jimfs)
-
-    // Needed because we have a custom log4j plugin, and they removed package scanning and require a data file to be generated
-    implementation(libs.log4j.core)
-    annotationProcessor(libs.bundles.log4j)
-
-    testCompileOnly(libs.nulls)
-    testRuntimeOnly(libs.bootstrap)
+    implementation('net.sf.jopt-simple:jopt-simple:5.0.4')
+    compileOnly('org.jetbrains:annotations:23.0.0')
+    api("org.ow2.asm:asm:${ASM_VERSION}")
+    api("org.ow2.asm:asm-tree:${ASM_VERSION}")
+    api("org.ow2.asm:asm-commons:${ASM_VERSION}")
+    api('net.minecraftforge:forgespi:4.0.+')
+    api('org.apache.logging.log4j:log4j-api:2.17.0')
+    api('org.slf4j:slf4j-api:1.8.0-beta4')
+    api('com.google.guava:guava:21.0')
+    api('com.google.code.gson:gson:2.8.9')
+    api('org.apache.maven:maven-artifact:3.8.1')
+    api('org.apache.commons:commons-lang3:3.12.0')
+    api('com.electronwill.night-config:core:3.6.4')
+    api('com.electronwill.night-config:toml:3.6.4')
+    api('cpw.mods:modlauncher:9.0.+')
+    api('net.minecraftforge:coremods:5.0.+')
+    implementation("cpw.mods:securejarhandler:${SECUREJARHANDLER_VERSION}")
+    implementation('org.apache.logging.log4j:log4j-core:2.17.0')
+    annotationProcessor('org.apache.logging.log4j:log4j-core:2.17.0')
+    implementation('net.minecraftforge:accesstransformers:8.0.4')
+    implementation('net.minecrell:terminalconsoleappender:1.2.0')
+//    implementation('org.jline:jline:3.12.+')
+    testCompileOnly('org.jetbrains:annotations:21.0.0')
+    testRuntimeOnly("cpw.mods:bootstraplauncher:${BOOTSTRAPLAUNCHER_VERSION}")
 }
 
-java {
-    toolchain.languageVersion = JavaLanguageVersion.of(JAVA_VERSION)
-    withSourcesJar()
+task sourcesJar(type: Jar) {
+    archiveClassifier = 'sources'
+    from sourceSets.main.allSource
 }
 
-tasks.named('jar', Jar).configure {
-    manifest {
-        attributes([
-            'Automatic-Module-Name': 'net.minecraftforge.fmlloader',
-            'Forge-Module-Layer':    'boot'
-        ] as LinkedHashMap)
-        attributes([
-            'Specification-Title':   'FMLLoader',
-            'Specification-Vendor':  'Forge Development LLC',
-            'Specification-Version': '1',
-            'Implementation-Title':  'FMLLoader',
-            'Implementation-Vendor': 'Forge Development LLC',
-            'Implementation-Version': FORGE_VERSION
-        ] as LinkedHashMap, 'net/minecraftforge/fml/loading/')
+ext {
+    MANIFESTS = [
+        '/': [
+            'Timestamp': new Date().format("yyyy-MM-dd'T'HH:mm:ssZ"),
+            'Git-Commit': GIT_INFO.abbreviatedId,
+            'Git-Branch': GIT_INFO.branch,
+            'Build-Number': "${System.getenv('BUILD_NUMBER')?:0}",
+        ] as LinkedHashMap,
+        'net/minecraftforge/fml/loading/': [
+            'Specification-Title':      'FMLLoader',
+            'Specification-Vendor':     'Forge Development LLC',
+            'Specification-Version':    '1',
+            'Implementation-Title':     'FML Loader',
+            'Implementation-Version':   '1.0',
+            'Implementation-Vendor':    'Forge'
+        ] as LinkedHashMap
+    ]
+}
+
+jar.doFirst {
+    MANIFESTS.each { pkg, values ->
+        manifest.attributes(values, pkg)
     }
 }
 
-tasks.withType(JavaCompile).configureEach {
+tasks.withType(JavaCompile) {
     options.compilerArgs << '-Xlint:unchecked'
 }
 
-license {
-    header = rootProject.file('LICENSE-header.txt')
+artifacts {
+    archives jar
+    archives sourcesJar
 }
 
-publishing {
-    publications.register('mavenJava', MavenPublication).configure {
-        from components.java
-        artifactId = 'fmlloader'
-        pom {
-            name = project.name
-            description = 'Modifactions to Minecraft to enable mod developers.'
-            url = 'https://github.com/MinecraftForge/MinecraftForge'
-            PomUtils.setGitHubDetails(pom, 'MinecraftForge')
-            license PomUtils.Licenses.LGPLv2_1
-        }
-    }
-
-    repositories {
-        maven gradleutils.publishingForgeMaven
-    }
-}
-
-tasks.register('writeForgeVersionJson') {
-    doLast {
-        file('src/main/resources/forge_version.json').json = [
-            forge: FORGE_VERSION,
-            mc: MC_VERSION,
-            mcp: MCP_VERSION
-        ]
-    }
-}
-
-tasks.named('generateResources').configure {
-    dependsOn('eclipseJdt')
-    dependsOn('eclipseJdtApt')
-    dependsOn('eclipseFactorypath')
-    dependsOn('writeForgeVersionJson')
-}
-
-eclipse {
-    classpath {
-       // We need to set the default output directory for the log4j annotation processor
-       // Ideally we'd just set the value, but the eclipse plugin deduplicates the output directories
-       // So we have to do a hacky whenMerged
-       //defaultOutputDir = file('bin/main')
-       file.whenMerged {
-           entries.each { entry ->
-               if (entry.kind == 'output' && entry.hasProperty('path'))
-                   entry.path = 'bin/main'
-           }
-       }
-    }
+publishing.publications.mavenJava(MavenPublication) {
+    from components.java
+    artifact sourcesJar
 }

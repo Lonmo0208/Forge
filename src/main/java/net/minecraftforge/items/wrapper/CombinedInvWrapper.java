@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Forge Development LLC and contributors
+ * Minecraft Forge - Forge Development LLC
  * SPDX-License-Identifier: LGPL-2.1-only
  */
 
@@ -7,7 +7,8 @@ package net.minecraftforge.items.wrapper;
 
 import net.minecraft.world.item.ItemStack;
 import net.minecraftforge.items.IItemHandlerModifiable;
-import org.jetbrains.annotations.NotNull;
+
+import javax.annotation.Nonnull;
 
 // combines multiple IItemHandlerModifiable into one interface
 public class CombinedInvWrapper implements IItemHandlerModifiable
@@ -65,7 +66,7 @@ public class CombinedInvWrapper implements IItemHandlerModifiable
     }
 
     @Override
-    public void setStackInSlot(int slot, @NotNull ItemStack stack)
+    public void setStackInSlot(int slot, @Nonnull ItemStack stack)
     {
         int index = getIndexForSlot(slot);
         IItemHandlerModifiable handler = getHandlerFromIndex(index);
@@ -80,7 +81,7 @@ public class CombinedInvWrapper implements IItemHandlerModifiable
     }
 
     @Override
-    @NotNull
+    @Nonnull
     public ItemStack getStackInSlot(int slot)
     {
         int index = getIndexForSlot(slot);
@@ -90,8 +91,8 @@ public class CombinedInvWrapper implements IItemHandlerModifiable
     }
 
     @Override
-    @NotNull
-    public ItemStack insertItem(int slot, @NotNull ItemStack stack, boolean simulate)
+    @Nonnull
+    public ItemStack insertItem(int slot, @Nonnull ItemStack stack, boolean simulate)
     {
         int index = getIndexForSlot(slot);
         IItemHandlerModifiable handler = getHandlerFromIndex(index);
@@ -100,7 +101,7 @@ public class CombinedInvWrapper implements IItemHandlerModifiable
     }
 
     @Override
-    @NotNull
+    @Nonnull
     public ItemStack extractItem(int slot, int amount, boolean simulate)
     {
         int index = getIndexForSlot(slot);
@@ -119,7 +120,7 @@ public class CombinedInvWrapper implements IItemHandlerModifiable
     }
 
     @Override
-    public boolean isItemValid(int slot, @NotNull ItemStack stack)
+    public boolean isItemValid(int slot, @Nonnull ItemStack stack)
     {
         int index = getIndexForSlot(slot);
         IItemHandlerModifiable handler = getHandlerFromIndex(index);

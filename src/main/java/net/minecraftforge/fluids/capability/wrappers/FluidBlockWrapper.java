@@ -1,18 +1,19 @@
 /*
- * Copyright (c) Forge Development LLC and contributors
+ * Minecraft Forge - Forge Development LLC
  * SPDX-License-Identifier: LGPL-2.1-only
  */
 
 package net.minecraftforge.fluids.capability.wrappers;
 
+import javax.annotation.Nonnull;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.Level;
+import net.minecraftforge.fluids.FluidAttributes;
 import net.minecraftforge.fluids.FluidStack;
-import net.minecraftforge.fluids.FluidType;
 import net.minecraftforge.fluids.IFluidBlock;
 import net.minecraftforge.fluids.capability.IFluidHandler;
 
-import org.jetbrains.annotations.NotNull;
+import net.minecraftforge.fluids.capability.IFluidHandler.FluidAction;
 
 public class FluidBlockWrapper implements IFluidHandler
 {
@@ -33,7 +34,7 @@ public class FluidBlockWrapper implements IFluidHandler
         return 1;
     }
 
-    @NotNull
+    @Nonnull
     @Override
     public FluidStack getFluidInTank(int tank)
     {
@@ -52,11 +53,11 @@ public class FluidBlockWrapper implements IFluidHandler
                 return (int) (stored.getAmount() / filledPercentage);
             }
         }
-        return FluidType.BUCKET_VOLUME;
+        return FluidAttributes.BUCKET_VOLUME;
     }
 
     @Override
-    public boolean isFluidValid(int tank, @NotNull FluidStack stack)
+    public boolean isFluidValid(int tank, @Nonnull FluidStack stack)
     {
         return stack.getFluid() == fluidBlock.getFluid();
     }
@@ -67,7 +68,7 @@ public class FluidBlockWrapper implements IFluidHandler
         return fluidBlock.place(world, blockPos, resource, action);
     }
 
-    @NotNull
+    @Nonnull
     @Override
     public FluidStack drain(FluidStack resource, FluidAction action)
     {
@@ -86,7 +87,7 @@ public class FluidBlockWrapper implements IFluidHandler
         return FluidStack.EMPTY;
     }
 
-    @NotNull
+    @Nonnull
     @Override
     public FluidStack drain(int maxDrain, FluidAction action)
     {

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Forge Development LLC and contributors
+ * Minecraft Forge - Forge Development LLC
  * SPDX-License-Identifier: LGPL-2.1-only
  */
 
@@ -9,7 +9,8 @@ import net.minecraft.world.Container;
 import net.minecraft.world.item.ItemStack;
 import net.minecraftforge.items.IItemHandlerModifiable;
 import net.minecraftforge.items.ItemHandlerHelper;
-import org.jetbrains.annotations.NotNull;
+
+import javax.annotation.Nonnull;
 
 public class InvWrapper implements IItemHandlerModifiable
 {
@@ -47,15 +48,15 @@ public class InvWrapper implements IItemHandlerModifiable
     }
 
     @Override
-    @NotNull
+    @Nonnull
     public ItemStack getStackInSlot(int slot)
     {
         return getInv().getItem(slot);
     }
 
     @Override
-    @NotNull
-    public ItemStack insertItem(int slot, @NotNull ItemStack stack, boolean simulate)
+    @Nonnull
+    public ItemStack insertItem(int slot, @Nonnull ItemStack stack, boolean simulate)
     {
         if (stack.isEmpty())
             return ItemStack.EMPTY;
@@ -143,7 +144,7 @@ public class InvWrapper implements IItemHandlerModifiable
     }
 
     @Override
-    @NotNull
+    @Nonnull
     public ItemStack extractItem(int slot, int amount, boolean simulate)
     {
         if (amount == 0)
@@ -178,7 +179,7 @@ public class InvWrapper implements IItemHandlerModifiable
     }
 
     @Override
-    public void setStackInSlot(int slot, @NotNull ItemStack stack)
+    public void setStackInSlot(int slot, @Nonnull ItemStack stack)
     {
         getInv().setItem(slot, stack);
     }
@@ -190,7 +191,7 @@ public class InvWrapper implements IItemHandlerModifiable
     }
 
     @Override
-    public boolean isItemValid(int slot, @NotNull ItemStack stack)
+    public boolean isItemValid(int slot, @Nonnull ItemStack stack)
     {
         return getInv().canPlaceItem(slot, stack);
     }

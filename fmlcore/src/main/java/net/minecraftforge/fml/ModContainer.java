@@ -1,6 +1,20 @@
 /*
- * Copyright (c) Forge Development LLC and contributors
- * SPDX-License-Identifier: LGPL-2.1-only
+ * Minecraft Forge
+ * Copyright (c) 2016-2021.
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation version 2.1
+ * of the License.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
 package net.minecraftforge.fml;
@@ -12,13 +26,14 @@ import net.minecraftforge.fml.event.IModBusEvent;
 import net.minecraftforge.forgespi.language.IModInfo;
 
 import java.util.EnumMap;
-import java.util.HashSet;
+import java.util.HashMap;
 import java.util.IdentityHashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.Set;
-import java.util.function.BiPredicate;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
+import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
@@ -30,82 +45,89 @@ import java.util.function.Supplier;
  * a mechanism by which we can wrap actual mod code so that the loader and other
  * facilities can treat mods at arms length.
  * </p>
+ *
+ * @author cpw
+ *
  */
-public abstract class ModContainer {
+
+public abstract class ModContainer
+{
     protected final String modId;
     protected final String namespace;
     protected final IModInfo modInfo;
     protected ModLoadingStage modLoadingStage;
     protected Supplier<?> contextExtension;
-    protected final Map<ModLoadingStage, Runnable> activityMap = new EnumMap<>(ModLoadingStage.class);
+    protected final Map<ModLoadingStage, Runnable> activityMap = new HashMap<>();
     protected final Map<Class<? extends IExtensionPoint<?>>, Supplier<?>> extensionPoints = new IdentityHashMap<>();
     protected final EnumMap<ModConfig.Type, ModConfig> configs = new EnumMap<>(ModConfig.Type.class);
-    final Set<ModContainer> dependencies = new HashSet<>();
-    /**
-     * If you want to handle the event, override {@link #dispatchConfigEvent(IConfigEvent)}
-     */
-    @Deprecated(since = "1.21.3", forRemoval = true)
+    @SuppressWarnings("OptionalUsedAsFieldOrParameterType")
     protected Optional<Consumer<IConfigEvent>> configHandler = Optional.empty();
 
-    public ModContainer(IModInfo info) {
+    public ModContainer(IModInfo info)
+    {
         this.modId = info.getModId();
         // TODO: Currently not reading namespace from configuration..
         this.namespace = this.modId;
         this.modInfo = info;
         this.modLoadingStage = ModLoadingStage.CONSTRUCT;
-
-        final String displayTestString = info.getConfig().<String>getConfigElement("displayTest")
-                .orElseGet(() -> info.getOwningFile().isClientSideOnly() ? "IGNORE_ALL_VERSION" : "MATCH_VERSION");
-        Supplier<IExtensionPoint.DisplayTest> displayTestSupplier = switch (displayTestString) {
-            case "MATCH_VERSION" -> // default displaytest checks for version string match
-                    () -> new IExtensionPoint.DisplayTest(() -> this.modInfo.getVersion().toString(),
-                        (incoming, isNetwork) -> Objects.equals(incoming, this.modInfo.getVersion().toString()));
-            case "IGNORE_SERVER_VERSION" -> // Ignores any version information coming from the server - use for server only mods
-                    IExtensionPoint.DisplayTest.IGNORE_SERVER_VERSION;
-            case "IGNORE_ALL_VERSION" -> // Ignores all information and provides no information
-                    IExtensionPoint.DisplayTest.IGNORE_ALL_VERSION;
-            case "NONE" -> null; // NO display test at all - use this if you're going to do your own display test
-            default -> // any other value throws an exception
-                    throw new IllegalArgumentException("Invalid displayTest value supplied in mods.toml");
-        };
-        if (displayTestSupplier != null)
-            registerExtensionPoint(IExtensionPoint.DisplayTest.class, displayTestSupplier);
-        else
-            extensionPoints.remove(IExtensionPoint.DisplayTest.class);
+        // default displaytest extension checks for version string match
+        registerExtensionPoint(IExtensionPoint.DisplayTest.class, () -> new IExtensionPoint.DisplayTest(()->this.modInfo.getVersion().toString(),
+                (incoming, isNetwork)->Objects.equals(incoming, this.modInfo.getVersion().toString())));
     }
 
     /**
      * Errored container state, used for filtering. Does nothing.
      */
-    ModContainer() {
+    ModContainer()
+    {
         this.modLoadingStage = ModLoadingStage.ERROR;
         modId = "BROKEN";
         namespace = "BROKEN";
         modInfo = null;
     }
-
     /**
      * @return the modid for this mod
      */
-    public final String getModId() {
+    public final String getModId()
+    {
         return modId;
     }
 
     /**
      * @return the resource prefix for the mod
      */
-    public final String getNamespace() {
+    public final String getNamespace()
+    {
         return namespace;
     }
 
     /**
      * @return The current loading stage for this mod
      */
-    public ModLoadingStage getCurrentState() {
+    public ModLoadingStage getCurrentState()
+    {
         return modLoadingStage;
     }
 
-    public IModInfo getModInfo() {
+    public static <T extends Event & IModBusEvent> CompletableFuture<Void> buildTransitionHandler(
+            final ModContainer target,
+            final IModStateTransition.EventGenerator<T> eventGenerator,
+            final BiFunction<ModLoadingStage, Throwable, ModLoadingStage> stateChangeHandler,
+            final Executor executor) {
+        return CompletableFuture
+                .runAsync(() -> {
+                    ModLoadingContext.get().setActiveContainer(target);
+                    target.activityMap.getOrDefault(target.modLoadingStage, ()->{}).run();
+                    target.acceptEvent(eventGenerator.apply(target));
+                }, executor)
+                .whenComplete((mc, exception) -> {
+                    target.modLoadingStage = stateChangeHandler.apply(target.modLoadingStage, exception);
+                    ModLoadingContext.get().setActiveContainer(null);
+                });
+    }
+
+    public IModInfo getModInfo()
+    {
         return modInfo;
     }
 
@@ -114,24 +136,9 @@ public abstract class ModContainer {
         return Optional.ofNullable((T)extensionPoints.getOrDefault(point,()-> null).get());
     }
 
-    public <T extends Record & IExtensionPoint<T>> void registerExtensionPoint(Class<? extends IExtensionPoint<T>> point, Supplier<T> extension) {
+    public <T extends Record & IExtensionPoint<T>> void registerExtensionPoint(Class<? extends IExtensionPoint<T>> point, Supplier<T> extension)
+    {
         extensionPoints.put(point, extension);
-    }
-
-    public void registerDisplayTest(IExtensionPoint.DisplayTest displayTest) {
-        registerExtensionPoint(IExtensionPoint.DisplayTest.class, () -> displayTest);
-    }
-
-    public void registerDisplayTest(Supplier<IExtensionPoint.DisplayTest> displayTest) {
-        registerExtensionPoint(IExtensionPoint.DisplayTest.class, displayTest);
-    }
-
-    public void registerDisplayTest(String version, BiPredicate<String, Boolean> remoteVersionTest) {
-        registerDisplayTest(new IExtensionPoint.DisplayTest(version, remoteVersionTest));
-    }
-
-    public void registerDisplayTest(Supplier<String> suppliedVersion, BiPredicate<String, Boolean> remoteVersionTest) {
-        registerDisplayTest(new IExtensionPoint.DisplayTest(suppliedVersion, remoteVersionTest));
     }
 
     public void addConfig(final ModConfig modConfig) {
@@ -139,10 +146,7 @@ public abstract class ModContainer {
     }
 
     public void dispatchConfigEvent(IConfigEvent event) {
-        var handler = configHandler.orElse(null);
-        if (handler != null) {
-            handler.accept(event);
-        }
+        configHandler.ifPresent(configHandler->configHandler.accept(event));
     }
 
     /**

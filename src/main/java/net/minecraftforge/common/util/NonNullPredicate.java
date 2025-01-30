@@ -1,20 +1,20 @@
 /*
- * Copyright (c) Forge Development LLC and contributors
+ * Minecraft Forge - Forge Development LLC
  * SPDX-License-Identifier: LGPL-2.1-only
  */
 
 package net.minecraftforge.common.util;
 
-import org.jetbrains.annotations.NotNull;
+import javax.annotation.Nonnull;
 import java.util.function.Predicate;
 
 /**
  * Equivalent to {@link Predicate}, except with nonnull contract.
- *
+ * 
  * @see Predicate
  */
 @FunctionalInterface
 public interface NonNullPredicate<T>
 {
-    boolean test(@NotNull T t);
+    boolean test(@Nonnull T t);
 }

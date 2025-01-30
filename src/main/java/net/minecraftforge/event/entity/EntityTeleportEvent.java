@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Forge Development LLC and contributors
+ * Minecraft Forge - Forge Development LLC
  * SPDX-License-Identifier: LGPL-2.1-only
  */
 
@@ -9,14 +9,11 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.projectile.ThrownEnderpearl;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.eventbus.api.Cancelable;
 import net.minecraftforge.eventbus.api.Event;
 import net.minecraftforge.fml.LogicalSide;
-import org.jetbrains.annotations.ApiStatus;
-import org.jetbrains.annotations.Nullable;
 
 /**
  * EntityTeleportEvent is fired when an event involving any teleportation of an Entity occurs.<br>
@@ -153,16 +150,13 @@ public class EntityTeleportEvent extends EntityEvent
         private final ServerPlayer player;
         private final ThrownEnderpearl pearlEntity;
         private float attackDamage;
-        private final HitResult hitResult;
 
-        @ApiStatus.Internal
-        public EnderPearl(ServerPlayer entity, double targetX, double targetY, double targetZ, ThrownEnderpearl pearlEntity, float attackDamage, HitResult hitResult)
+        public EnderPearl(ServerPlayer entity, double targetX, double targetY, double targetZ, ThrownEnderpearl pearlEntity, float attackDamage)
         {
             super(entity, targetX, targetY, targetZ);
             this.pearlEntity = pearlEntity;
             this.player = entity;
             this.attackDamage = attackDamage;
-            this.hitResult = hitResult;
         }
 
         public ThrownEnderpearl getPearlEntity()
@@ -173,12 +167,6 @@ public class EntityTeleportEvent extends EntityEvent
         public ServerPlayer getPlayer()
         {
             return player;
-        }
-
-        @Nullable
-        public HitResult getHitResult()
-        {
-            return this.hitResult;
         }
 
         public float getAttackDamage()

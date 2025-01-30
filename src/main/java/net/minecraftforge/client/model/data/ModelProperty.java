@@ -1,38 +1,28 @@
 /*
- * Copyright (c) Forge Development LLC and contributors
+ * Minecraft Forge - Forge Development LLC
  * SPDX-License-Identifier: LGPL-2.1-only
  */
 
 package net.minecraftforge.client.model.data;
 
-import com.google.common.base.Predicates;
-
 import java.util.function.Predicate;
 
-/**
- * A property to be used in {@link ModelData}.
- * <p>
- * May optionally validate incoming values.
- *
- * @see ModelData
- */
-public class ModelProperty<T> implements Predicate<T>
-{
-    private final Predicate<T> predicate;
+import com.google.common.base.Predicates;
 
-    public ModelProperty()
-    {
+public class ModelProperty<T> implements Predicate<T> {
+    
+    private final Predicate<T> pred;
+    
+    public ModelProperty() {
         this(Predicates.alwaysTrue());
     }
-
-    public ModelProperty(Predicate<T> predicate)
-    {
-        this.predicate = predicate;
+    
+    public ModelProperty(Predicate<T> pred) {
+        this.pred = pred;
     }
 
     @Override
-    public boolean test(T value)
-    {
-        return predicate.test(value);
+    public boolean test(T t) {
+        return pred.test(t);
     }
 }

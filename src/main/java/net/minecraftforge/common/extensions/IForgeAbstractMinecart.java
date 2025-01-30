@@ -1,16 +1,19 @@
 /*
- * Copyright (c) Forge Development LLC and contributors
+ * Minecraft Forge - Forge Development LLC
  * SPDX-License-Identifier: LGPL-2.1-only
  */
 
 package net.minecraftforge.common.extensions;
 
 import net.minecraft.world.entity.vehicle.AbstractMinecart;
+import net.minecraft.world.item.Items;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.tags.BlockTags;
 import net.minecraft.core.BlockPos;
 import net.minecraft.util.Mth;
 
-public interface IForgeAbstractMinecart {
+public interface IForgeAbstractMinecart
+{
     public static float DEFAULT_MAX_SPEED_AIR_LATERAL = 0.4f;
     public static float DEFAULT_MAX_SPEED_AIR_VERTICAL = -1.0f;
     public static double DEFAULT_AIR_DRAG = 0.95f;
@@ -22,16 +25,37 @@ public interface IForgeAbstractMinecart {
     /**
      * Internal, returns the current spot to look for the attached rail.
      */
-    default BlockPos getCurrentRailPosition() {
+    default BlockPos getCurrentRailPosition()
+    {
         int x = Mth.floor(self().getX());
         int y = Mth.floor(self().getY());
         int z = Mth.floor(self().getZ());
         BlockPos pos = new BlockPos(x, y, z);
-        if (self().level().getBlockState(pos.below()).is(BlockTags.RAILS)) pos = pos.below();
+        if (self().level.getBlockState(pos.below()).is(BlockTags.RAILS)) pos = pos.below();
         return pos;
     }
 
     double getMaxSpeedWithRail();
+
+    /**
+     * Moved to allow overrides.
+     * This code handles minecart movement and speed capping when on a rail.
+     */
+    void moveMinecartOnRail(BlockPos pos);
+
+    /**
+     * This function returns an ItemStack that represents this cart.
+     * This should be an ItemStack that can be used by the player to place the cart,
+     * but is not necessary the item the cart drops when destroyed.
+     * @return An ItemStack that can be used to place the cart.
+     * 
+     * @deprecated TODO Remove in 1.19 - use {@link AbstractMinecart#getPickResult()} instead
+     */
+    @Deprecated(forRemoval = true)
+    default ItemStack getCartItem()
+    {
+        return new ItemStack(Items.MINECART);
+    }
 
     /**
      * Returns true if this cart can currently use rails.
@@ -46,6 +70,30 @@ public interface IForgeAbstractMinecart {
      * @param use Whether the minecart can currently use rails.
      */
     void setCanUseRail(boolean use);
+
+    /**
+     * Return false if this cart should not call onMinecartPass() and should ignore Powered Rails.
+     * @return True if this cart should call onMinecartPass().
+     */
+    default boolean shouldDoRailFunctions() {
+        return true;
+    }
+
+    /**
+     * Returns true if this cart is self propelled.
+     * @return True if powered.
+     */
+    default boolean isPoweredCart() {
+        return self().getMinecartType() == AbstractMinecart.Type.FURNACE;
+    }
+
+    /**
+     * Returns true if this cart can be ridden by an Entity.
+     * @return True if this cart can be ridden.
+     */
+    default boolean canBeRidden() {
+        return self().getMinecartType() == AbstractMinecart.Type.RIDEABLE;
+    }
 
     /**
      * Returns the carts max speed when traveling on rails. Carts going faster
@@ -74,6 +122,10 @@ public interface IForgeAbstractMinecart {
     void setMaxSpeedAirVertical(float value);
     double getDragAir();
     void setDragAir(double value);
+
+    default double getSlopeAdjustment() {
+        return 0.0078125D;
+    }
 
     /**
      * Called from Detector Rails to retrieve a redstone power level for comparators.

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Forge Development LLC and contributors
+ * Minecraft Forge - Forge Development LLC
  * SPDX-License-Identifier: LGPL-2.1-only
  */
 
@@ -9,7 +9,8 @@ import net.minecraft.world.level.material.Fluid;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.Level;
 import net.minecraftforge.fluids.capability.IFluidHandler;
-import org.jetbrains.annotations.NotNull;
+
+import javax.annotation.Nonnull;
 
 /**
  * Implement this interface on Block classes which represent world-placeable Fluids.
@@ -34,7 +35,7 @@ public interface IFluidBlock
      * @param action     If SIMULATE, the placement will only be simulated
      * @return the amount of fluid extracted from the provided stack to achieve some fluid level
      */
-    int place(Level level, BlockPos pos, @NotNull FluidStack fluidStack, IFluidHandler.FluidAction action);
+    int place(Level level, BlockPos pos, @Nonnull FluidStack fluidStack, IFluidHandler.FluidAction action);
 
     /**
      * Attempt to drain the block. This method should be called by devices such as pumps.
@@ -45,7 +46,7 @@ public interface IFluidBlock
      *            If SIMULATE, the drain will only be simulated.
      * @return the fluid stack after draining the block
      */
-    @NotNull
+    @Nonnull
     FluidStack drain(Level level, BlockPos pos, IFluidHandler.FluidAction action);
 
     /**

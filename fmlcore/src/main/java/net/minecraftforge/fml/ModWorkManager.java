@@ -1,6 +1,20 @@
 /*
- * Copyright (c) Forge Development LLC and contributors
- * SPDX-License-Identifier: LGPL-2.1-only
+ * Minecraft Forge
+ * Copyright (c) 2016-2021.
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation version 2.1
+ * of the License.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
 package net.minecraftforge.fml;
@@ -17,16 +31,14 @@ import static net.minecraftforge.fml.Logging.LOADING;
 public class ModWorkManager {
     private static final Logger LOGGER = LogManager.getLogger();
     private static final long PARK_TIME = TimeUnit.MILLISECONDS.toNanos(1);
-
     public interface DrivenExecutor extends Executor {
         boolean selfDriven();
         boolean driveOne();
 
         default void drive(Runnable ticker) {
             if (!selfDriven()) {
-                ticker.run();
-                while (true) {
-                    if (!driveOne()) break;
+                while (driveOne()) {
+                    ticker.run();
                 }
             } else {
                 // park for a bit so other threads can schedule
@@ -34,11 +46,8 @@ public class ModWorkManager {
             }
         }
     }
-
-    private record SyncExecutor(ConcurrentLinkedDeque<Runnable> tasks) implements DrivenExecutor {
-        public SyncExecutor() {
-            this(new ConcurrentLinkedDeque<>());
-        }
+    private static class SyncExecutor implements DrivenExecutor {
+        private ConcurrentLinkedDeque<Runnable> tasks = new ConcurrentLinkedDeque<>();
 
         @Override
         public boolean driveOne() {
@@ -60,7 +69,13 @@ public class ModWorkManager {
         }
     }
 
-    private record WrappingExecutor(Executor wrapped) implements DrivenExecutor {
+    private static class WrappingExecutor implements DrivenExecutor {
+        private final Executor wrapped;
+
+        public WrappingExecutor(final Executor executor) {
+            this.wrapped = executor;
+        }
+
         @Override
         public boolean selfDriven() {
             return true;
@@ -77,9 +92,11 @@ public class ModWorkManager {
         }
     }
 
-    private static final SyncExecutor syncExecutor = new SyncExecutor();
+    private static SyncExecutor syncExecutor;
 
     public static DrivenExecutor syncExecutor() {
+        if (syncExecutor == null)
+            syncExecutor = new SyncExecutor();
         return syncExecutor;
     }
 
@@ -87,8 +104,14 @@ public class ModWorkManager {
         return new WrappingExecutor(executor);
     }
 
+    private static ForkJoinPool parallelThreadPool;
     public static Executor parallelExecutor() {
-        return LazyInit.PARALLEL_EXECUTOR;
+        if (parallelThreadPool == null) {
+            final int loadingThreadCount = FMLConfig.loadingThreadCount();
+            LOGGER.debug(LOADING, "Using {} threads for parallel mod-loading", loadingThreadCount);
+            parallelThreadPool = new ForkJoinPool(loadingThreadCount, ModWorkManager::newForkJoinWorkerThread, null, false);
+        }
+        return parallelThreadPool;
     }
 
     private static ForkJoinWorkerThread newForkJoinWorkerThread(ForkJoinPool pool) {
@@ -99,14 +122,4 @@ public class ModWorkManager {
         return thread;
     }
 
-    private static final class LazyInit {
-        private LazyInit() {}
-        private static final ForkJoinPool PARALLEL_EXECUTOR;
-
-        static {
-            final int loadingThreadCount = FMLConfig.getIntConfigValue(FMLConfig.ConfigValue.MAX_THREADS);
-            LOGGER.debug(LOADING, "Using {} threads for parallel mod-loading", loadingThreadCount);
-            PARALLEL_EXECUTOR = new ForkJoinPool(loadingThreadCount, ModWorkManager::newForkJoinWorkerThread, null, false);
-        }
-    }
 }

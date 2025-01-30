@@ -1,11 +1,11 @@
 --- a/net/minecraft/world/entity/projectile/LargeFireball.java
 +++ b/net/minecraft/world/entity/projectile/LargeFireball.java
-@@ -29,7 +_,7 @@
-     protected void onHit(HitResult p_37218_) {
-         super.onHit(p_37218_);
-         if (this.level() instanceof ServerLevel serverlevel) {
--            boolean flag = serverlevel.getGameRules().getBoolean(GameRules.RULE_MOBGRIEFING);
-+            boolean flag = net.minecraftforge.event.ForgeEventFactory.getMobGriefingEvent(serverlevel, this.getOwner());
-             this.level().explode(this, this.getX(), this.getY(), this.getZ(), (float)this.explosionPower, flag, Level.ExplosionInteraction.MOB);
-             this.discard();
-         }
+@@ -26,7 +_,7 @@
+    protected void m_6532_(HitResult p_37218_) {
+       super.m_6532_(p_37218_);
+       if (!this.f_19853_.f_46443_) {
+-         boolean flag = this.f_19853_.m_46469_().m_46207_(GameRules.f_46132_);
++         boolean flag = net.minecraftforge.event.ForgeEventFactory.getMobGriefingEvent(this.f_19853_, this.m_37282_());
+          this.f_19853_.m_46518_((Entity)null, this.m_20185_(), this.m_20186_(), this.m_20189_(), (float)this.f_37197_, flag, flag ? Explosion.BlockInteraction.DESTROY : Explosion.BlockInteraction.NONE);
+          this.m_146870_();
+       }

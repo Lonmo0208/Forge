@@ -1,37 +1,54 @@
 /*
- * Copyright (c) Forge Development LLC and contributors
- * SPDX-License-Identifier: LGPL-2.1-only
+ * Minecraft Forge
+ * Copyright (c) 2016-2021.
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation version 2.1
+ * of the License.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
 package net.minecraftforge.fml.loading.moddiscovery;
 
-import com.mojang.logging.LogUtils;
 import net.minecraftforge.fml.loading.FMLPaths;
 import net.minecraftforge.fml.loading.LogMarkers;
 import net.minecraftforge.fml.loading.ModDirTransformerDiscoverer;
-import net.minecraftforge.forgespi.locating.IModLocator;
+import net.minecraftforge.fml.loading.StringUtils;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
-import org.slf4j.Logger;
-
-import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.List;
-import java.util.Locale;
+import java.util.Map;
+import java.util.stream.Stream;
+
+import static cpw.mods.modlauncher.api.LamdbaExceptionUtils.uncheck;
 
 /**
  * Support loading mods located in JAR files in the mods folder
  */
-public class ModsFolderLocator extends AbstractModProvider implements IModLocator {
+public class ModsFolderLocator extends AbstractJarFileLocator {
     private static final String SUFFIX = ".jar";
-    private static final Logger LOGGER = LogUtils.getLogger();
+    private static final Logger LOGGER = LogManager.getLogger();
     private final Path modFolder;
     private final String customName;
 
     public ModsFolderLocator() {
-        this(FMLPaths.MODSDIR.get(), "mods folder");
+        this(FMLPaths.MODSDIR.get());
+    }
+
+    ModsFolderLocator(Path modFolder) {
+        this(modFolder, "mods folder");
     }
 
     ModsFolderLocator(Path modFolder, String name) {
@@ -40,32 +57,13 @@ public class ModsFolderLocator extends AbstractModProvider implements IModLocato
     }
 
     @Override
-    public List<IModLocator.ModFileOrException> scanMods() {
-        LOGGER.debug(LogMarkers.SCAN, "Scanning mods dir {} for mods", this.modFolder);
+    public Stream<Path> scanCandidates() {
+        LOGGER.debug(LogMarkers.SCAN,"Scanning mods dir {} for mods", this.modFolder);
         var excluded = ModDirTransformerDiscoverer.allExcluded();
-        try {
-            var ret = new ArrayList<IModLocator.ModFileOrException>();
-            var files = Files.list(this.modFolder).toList();
-            for (var file : files) {
-                var name = file.getFileName().toString().toLowerCase(Locale.ROOT);
-                if (excluded.contains(file) || !name.endsWith(SUFFIX))
-                    continue;
-                var mod = this.createMod(file, true);
-                if (mod == null) {
-                    LOGGER.debug(LogMarkers.SCAN, "Found unknown jar file {} ignoring", file);
-                } else {
-                    ret.add(mod);
-                }
-            }
-            return ret;
-        } catch (IOException e) {
-            return sneak(e);
-        }
-    }
 
-    @SuppressWarnings("unchecked")
-    private static <E extends Throwable, R> R sneak(Throwable e) throws E {
-        throw (E)e;
+        return uncheck(()-> Files.list(this.modFolder))
+                .filter(p-> !excluded.contains(p) && StringUtils.toLowerCase(p.getFileName().toString()).endsWith(SUFFIX))
+                .sorted(Comparator.comparing(path-> StringUtils.toLowerCase(path.getFileName().toString())));
     }
 
     @Override
@@ -76,5 +74,9 @@ public class ModsFolderLocator extends AbstractModProvider implements IModLocato
     @Override
     public String toString() {
         return "{"+customName+" locator at "+this.modFolder+"}";
+    }
+
+    @Override
+    public void initArguments(final Map<String, ?> arguments) {
     }
 }

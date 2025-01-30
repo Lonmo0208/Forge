@@ -1,26 +1,11 @@
 --- a/net/minecraft/network/protocol/status/ClientboundStatusResponsePacket.java
 +++ b/net/minecraft/network/protocol/status/ClientboundStatusResponsePacket.java
-@@ -5,16 +_,22 @@
- import net.minecraft.network.protocol.Packet;
- import net.minecraft.network.protocol.PacketType;
+@@ -22,7 +_,7 @@
+    }
  
--public record ClientboundStatusResponsePacket(ServerStatus status) implements Packet<ClientStatusPacketListener> {
-+public record ClientboundStatusResponsePacket(ServerStatus status, @org.jetbrains.annotations.Nullable String cachedStatus) implements Packet<ClientStatusPacketListener> {
-     public static final StreamCodec<FriendlyByteBuf, ClientboundStatusResponsePacket> STREAM_CODEC = Packet.codec(
-         ClientboundStatusResponsePacket::write, ClientboundStatusResponsePacket::new
-     );
+    public void m_5779_(FriendlyByteBuf p_134899_) {
+-      p_134899_.m_130070_(f_134885_.toJson(this.f_134886_));
++      p_134899_.m_130070_(this.f_134886_.getJson()); //Forge: Let the response cache the JSON
+    }
  
-+    public ClientboundStatusResponsePacket(ServerStatus status) {
-+        this(status, null);
-+    }
-+
-     private ClientboundStatusResponsePacket(FriendlyByteBuf p_179834_) {
-         this(p_179834_.readJsonWithCodec(ServerStatus.CODEC));
-     }
- 
-     private void write(FriendlyByteBuf p_134899_) {
-+        if (cachedStatus != null) p_134899_.writeUtf(cachedStatus);
-+        else
-         p_134899_.writeJsonWithCodec(ServerStatus.CODEC, this.status);
-     }
- 
+    public void m_5797_(ClientStatusPacketListener p_134896_) {

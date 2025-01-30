@@ -1,18 +1,18 @@
 /*
- * Copyright (c) Forge Development LLC and contributors
+ * Minecraft Forge - Forge Development LLC
  * SPDX-License-Identifier: LGPL-2.1-only
  */
 
 package net.minecraftforge.event;
 
+import javax.annotation.Nullable;
+import net.minecraft.core.BlockPos;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.gameevent.GameEvent;
-import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.eventbus.api.Cancelable;
 import net.minecraftforge.eventbus.api.Event;
-import org.jetbrains.annotations.Nullable;
 
 /**
  * VanillaGameEvent is fired on the server whenever one of Vanilla's {@link GameEvent GameEvents} fire. <br>
@@ -27,16 +27,17 @@ import org.jetbrains.annotations.Nullable;
 public class VanillaGameEvent extends Event
 {
     private final Level level;
+    @Nullable
+    private final Entity cause;
     private final GameEvent vanillaEvent;
-    private final Vec3 position;
-    private final GameEvent.Context context;
+    private final BlockPos position;
 
-    public VanillaGameEvent(Level level, GameEvent vanillaEvent, Vec3 position, GameEvent.Context context)
+    public VanillaGameEvent(Level level, @Nullable Entity cause, GameEvent vanillaEvent, BlockPos position)
     {
         this.level = level;
+        this.cause = cause;
         this.vanillaEvent = vanillaEvent;
         this.position = position;
-        this.context = context;
     }
 
     /**
@@ -53,7 +54,7 @@ public class VanillaGameEvent extends Event
     @Nullable
     public Entity getCause()
     {
-        return context.sourceEntity();
+        return cause;
     }
 
     /**
@@ -65,18 +66,10 @@ public class VanillaGameEvent extends Event
     }
 
     /**
-     * @return The position the event took place at.
+     * @return The position the event took place at. This may be a block or the block position of the entity targeted.
      */
-    public Vec3 getEventPosition()
+    public BlockPos getEventPosition()
     {
         return position;
-    }
-
-    /**
-     * @return the context of the vanilla event
-     */
-    public GameEvent.Context getContext()
-    {
-        return context;
     }
 }

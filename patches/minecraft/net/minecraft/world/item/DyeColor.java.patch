@@ -1,48 +1,41 @@
 --- a/net/minecraft/world/item/DyeColor.java
 +++ b/net/minecraft/world/item/DyeColor.java
-@@ -49,6 +_,8 @@
-     private final int textureDiffuseColor;
-     private final int fireworkColor;
-     private final int textColor;
-+    private final net.minecraft.tags.TagKey<Item> dyesTag;
-+    private final net.minecraft.tags.TagKey<Item> dyedTag;
+@@ -39,6 +_,7 @@
+    private final MaterialColor f_41036_;
+    private final float[] f_41039_;
+    private final int f_41040_;
++   private final net.minecraft.tags.TagKey<Item> tag;
+    private final int f_41041_;
  
-     private DyeColor(final int p_41046_, final String p_41047_, final int p_41048_, final MapColor p_285297_, final int p_41050_, final int p_41051_) {
-         this.id = p_41046_;
-@@ -57,6 +_,8 @@
-         this.textColor = p_41051_;
-         this.textureDiffuseColor = ARGB.opaque(p_41048_);
-         this.fireworkColor = p_41050_;
-+        this.dyesTag = net.minecraft.tags.ItemTags.create("c", "dyes/" + p_41047_);
-+        this.dyedTag = net.minecraft.tags.ItemTags.create("c", "dyed/" + p_41047_);
-     }
+    private DyeColor(int p_41046_, String p_41047_, int p_41048_, MaterialColor p_41049_, int p_41050_, int p_41051_) {
+@@ -49,6 +_,7 @@
+       int i = (p_41048_ & 16711680) >> 16;
+       int j = (p_41048_ & '\uff00') >> 8;
+       int k = (p_41048_ & 255) >> 0;
++      this.tag = net.minecraft.tags.ItemTags.create(new net.minecraft.resources.ResourceLocation("forge", "dyes/" + p_41047_));
+       this.f_41039_ = new float[]{(float)i / 255.0F, (float)j / 255.0F, (float)k / 255.0F};
+       this.f_41040_ = p_41050_;
+    }
+@@ -106,5 +_,22 @@
  
-     public int getId() {
-@@ -107,6 +_,27 @@
-     @Override
-     public String getSerializedName() {
-         return this.name;
-+    }
+    public String m_7912_() {
+       return this.f_41035_;
++   }
 +
-+    /**
-+     * Gets the tag key representing the set of items which provide this dye colour.
-+     * @return A {@link net.minecraft.tags.TagKey<Item>} representing the set of items which provide this dye colour.
-+     */
-+    public net.minecraft.tags.TagKey<Item> getTag() {
-+        return dyesTag;
-+    }
++   public net.minecraft.tags.TagKey<Item> getTag() {
++      return tag;
++   }
 +
-+    /**
-+     * Gets the tag key representing the set of items which are dyed with this colour.
-+     * @return A {@link net.minecraft.tags.TagKey<Item>} representing the set of items which are dyed with this colour.
-+     */
-+    public net.minecraft.tags.TagKey<Item> getDyedTag() {
-+        return dyedTag;
-+    }
++   @Nullable
++   public static DyeColor getColor(ItemStack stack) {
++      if (stack.m_41720_() instanceof DyeItem)
++         return ((DyeItem)stack.m_41720_()).m_41089_();
 +
-+    @Nullable
-+    public static DyeColor getColor(ItemStack stack) {
-+        return net.minecraftforge.common.ForgeHooks.getDyeColorFromItemStack(stack);
-     }
- 
-     public static DyeColor getMixedColor(ServerLevel p_377753_, DyeColor p_378336_, DyeColor p_376650_) {
++      for (DyeColor color : f_41032_) {
++         if (stack.m_204117_(color.getTag()))
++             return color;
++      }
++
++      return null;
+    }
+ }

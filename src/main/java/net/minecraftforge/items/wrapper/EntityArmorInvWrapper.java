@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Forge Development LLC and contributors
+ * Minecraft Forge - Forge Development LLC
  * SPDX-License-Identifier: LGPL-2.1-only
  */
 
@@ -14,10 +14,10 @@ import net.minecraftforge.items.IItemHandler;
  * Exposes the armor inventory of an {@link LivingEntity} as an {@link IItemHandler} using {@link LivingEntity#getItemBySlot(EquipmentSlot)} and
  * {@link LivingEntity#setItemSlot(EquipmentSlot, ItemStack)}.
  */
-public class EntityArmorInvWrapper extends EntityEquipmentInvWrapper {
-    public EntityArmorInvWrapper(final LivingEntity entity) {
-        // some entities may not support setting values in this slot, but we never cared about that before so don't care now.
-        // Modders should implement their own inventory wrappers.
-        super(entity, EquipmentSlot.Type.HUMANOID_ARMOR, EquipmentSlot.Type.ANIMAL_ARMOR);
+public class EntityArmorInvWrapper extends EntityEquipmentInvWrapper
+{
+    public EntityArmorInvWrapper(final LivingEntity entity)
+    {
+        super(entity, EquipmentSlot.Type.ARMOR);
     }
 }

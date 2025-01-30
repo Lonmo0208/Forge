@@ -1,27 +1,19 @@
 --- a/net/minecraft/client/gui/screens/worldselection/CreateWorldScreen.java
 +++ b/net/minecraft/client/gui/screens/worldselection/CreateWorldScreen.java
-@@ -168,6 +_,7 @@
-     ) {
-         queueLoadScreen(p_369292_, PREPARING_WORLD_DATA);
-         PackRepository packrepository = new PackRepository(new ServerPacksSource(p_369292_.directoryValidator()));
-+        net.minecraftforge.event.ForgeEventFactory.addPackFindersServer(packrepository::addPackFinder);
-         WorldLoader.InitConfig worldloader$initconfig = createDefaultLoadConfig(packrepository, WorldDataConfiguration.DEFAULT);
-         CompletableFuture<WorldCreationContext> completablefuture = WorldLoader.load(
-             worldloader$initconfig,
-@@ -468,7 +_,7 @@
-                                         if (p_269627_) {
-                                             p_270552_.accept(this.uiState.getSettings().dataConfiguration());
-                                         } else {
--                                            p_270552_.accept(WorldDataConfiguration.DEFAULT);
-+                                            p_270552_.accept(new WorldDataConfiguration(new DataPackConfig(ImmutableList.of("vanilla"), ImmutableList.of()), FeatureFlags.DEFAULT_FLAGS)); // FORGE: Revert to *actual* vanilla data
-                                         }
-                                     },
-                                     Component.translatable("dataPack.validation.failed"),
-@@ -582,6 +_,7 @@
-         if (path != null) {
-             if (this.tempDataPackRepository == null) {
-                 this.tempDataPackRepository = ServerPacksSource.createPackRepository(path, this.packValidator);
-+                net.minecraftforge.resource.ResourcePackLoader.loadResourcePacks(this.tempDataPackRepository, false);
-                 this.tempDataPackRepository.reload();
-             }
+@@ -106,7 +_,7 @@
+ 
+    public static CreateWorldScreen m_205424_(@Nullable Screen p_205425_) {
+       RegistryAccess.Frozen registryaccess$frozen = RegistryAccess.f_123049_.get();
+-      return new CreateWorldScreen(p_205425_, DataPackConfig.f_45842_, new WorldGenSettingsComponent(registryaccess$frozen, WorldGenSettings.m_190050_(registryaccess$frozen), Optional.of(WorldPreset.f_101506_), OptionalLong.empty()));
++      return new CreateWorldScreen(p_205425_, DataPackConfig.f_45842_, new WorldGenSettingsComponent(registryaccess$frozen, net.minecraftforge.client.ForgeHooksClient.getDefaultWorldPreset().map(type -> type.m_205485_(registryaccess$frozen, new java.util.Random().nextLong(), true, false)).orElseGet(() -> WorldGenSettings.m_190050_(registryaccess$frozen)), net.minecraftforge.client.ForgeHooksClient.getDefaultWorldPreset(), OptionalLong.empty()));
+    }
+ 
+    public static CreateWorldScreen m_205426_(@Nullable Screen p_205427_, WorldStem p_205428_, @Nullable Path p_205429_) {
+@@ -625,6 +_,7 @@
+          File file1 = path.toFile();
+          if (this.f_100832_ == null) {
+             this.f_100832_ = new PackRepository(PackType.SERVER_DATA, new ServerPacksSource(), new FolderRepositorySource(file1, PackSource.f_10527_));
++            net.minecraftforge.resource.ResourcePackLoader.loadResourcePacks(this.f_100832_, net.minecraftforge.server.ServerLifecycleHooks::buildPackFinder);
+             this.f_100832_.m_10506_();
+          }
  

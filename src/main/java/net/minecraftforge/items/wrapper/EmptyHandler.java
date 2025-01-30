@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Forge Development LLC and contributors
+ * Minecraft Forge - Forge Development LLC
  * SPDX-License-Identifier: LGPL-2.1-only
  */
 
@@ -8,7 +8,8 @@ package net.minecraftforge.items.wrapper;
 import net.minecraft.world.item.ItemStack;
 import net.minecraftforge.items.IItemHandler;
 import net.minecraftforge.items.IItemHandlerModifiable;
-import org.jetbrains.annotations.NotNull;
+
+import javax.annotation.Nonnull;
 
 public class EmptyHandler implements IItemHandlerModifiable
 {
@@ -21,28 +22,28 @@ public class EmptyHandler implements IItemHandlerModifiable
     }
 
     @Override
-    @NotNull
+    @Nonnull
     public ItemStack getStackInSlot(int slot)
     {
         return ItemStack.EMPTY;
     }
 
     @Override
-    @NotNull
-    public ItemStack insertItem(int slot, @NotNull ItemStack stack, boolean simulate)
+    @Nonnull
+    public ItemStack insertItem(int slot, @Nonnull ItemStack stack, boolean simulate)
     {
         return stack;
     }
 
     @Override
-    @NotNull
+    @Nonnull
     public ItemStack extractItem(int slot, int amount, boolean simulate)
     {
         return ItemStack.EMPTY;
     }
 
     @Override
-    public void setStackInSlot(int slot, @NotNull ItemStack stack)
+    public void setStackInSlot(int slot, @Nonnull ItemStack stack)
     {
         // nothing to do here
     }
@@ -54,7 +55,7 @@ public class EmptyHandler implements IItemHandlerModifiable
     }
 
     @Override
-    public boolean isItemValid(int slot, @NotNull ItemStack stack)
+    public boolean isItemValid(int slot, @Nonnull ItemStack stack)
     {
         return false;
     }

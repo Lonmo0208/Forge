@@ -1,70 +1,81 @@
-/*
- * Copyright (c) Forge Development LLC and contributors
- * SPDX-License-Identifier: LGPL-2.1-only
- */
-
 package net.minecraftforge.fml.loading.moddiscovery;
 
 import cpw.mods.jarhandling.JarMetadata;
+import cpw.mods.jarhandling.SecureJar;
 import net.minecraftforge.forgespi.locating.IModFile;
-import java.lang.module.ModuleDescriptor;
-import java.util.Objects;
-import org.jetbrains.annotations.ApiStatus;
+import net.minecraftforge.forgespi.locating.IModLocator;
 
-@ApiStatus.Internal
+import java.lang.module.ModuleDescriptor;
+import java.nio.file.Path;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.function.BiPredicate;
+import java.util.function.Function;
+import java.util.function.Predicate;
+
 public final class ModJarMetadata implements JarMetadata {
-    private static final String AUTOMATIC_MODULE_NAME = "Automatic-Module-Name";
     private IModFile modFile;
-    private String name;
-    private String version;
     private ModuleDescriptor descriptor;
 
-    ModJarMetadata() { }
+    // TODO: Remove helper functions to cleanup api
+    @Deprecated(forRemoval = true, since="1.18")
+    static Optional<IModFile> buildFile(IModLocator locator, Predicate<SecureJar> jarTest, BiPredicate<String, String> filter, Path... files) {
+        return buildFile(j->new ModFile(j, locator, ModFileParser::modsTomlParser), jarTest, filter, files);
+    }
+
+    // TODO: Remove helper functions to cleanup api
+    @Deprecated(forRemoval = true, since="1.18")
+    static IModFile buildFile(IModLocator locator, Path... files) {
+        return buildFile(locator, j->true, (a,b) -> true, files).orElseThrow(()->new IllegalArgumentException("Failed to find valid JAR file"));
+    }
+
+    // TODO: Remove helper functions to cleanup api
+    @Deprecated(forRemoval = true, since="1.18")
+    static Optional<IModFile> buildFile(Function<SecureJar, IModFile> mfConstructor, Predicate<SecureJar> jarTest, BiPredicate<String, String> filter, Path... files) {
+        var mjm = new ModJarMetadata();
+        var sj = SecureJar.from(()->ModFile.DEFAULTMANIFEST, j->mjm, filter, files);
+        if (jarTest.test(sj)) {
+            var mf = mfConstructor.apply(sj);
+            mjm.setModFile(mf);
+            return Optional.of(mf);
+        } else {
+            return Optional.empty();
+        }
+    }
+
+    ModJarMetadata() {
+    }
 
     public void setModFile(IModFile file) {
         this.modFile = file;
-        var mods = this.modFile.getModFileInfo().getMods();
-
-        if (!mods.isEmpty()) {
-            var main = mods.get(0);
-            this.name = main.getModId();
-            this.version = main.getVersion().toString();
-        }
-
-        var jar = file.getSecureJar();
-        var aname = jar.moduleDataProvider().getManifest().getMainAttributes().getValue(AUTOMATIC_MODULE_NAME);
-        if (aname != null)
-            this.name = aname;
     }
 
     @Override
     public String name() {
-        return this.name;
+        return modFile.getModFileInfo().moduleName();
     }
 
     @Override
     public String version() {
-        return this.version;
+        return modFile.getModFileInfo().versionString();
     }
 
     @Override
     public ModuleDescriptor descriptor() {
-        if (descriptor != null)
-            return descriptor;
-
+        if (descriptor != null) return descriptor;
         var bld = ModuleDescriptor.newAutomaticModule(name())
-            .version(version())
-            .packages(modFile.getSecureJar().getPackages());
-
-        for (var provider : modFile.getSecureJar().getProviders()) {
-            if (provider.providers().isEmpty())
-                continue;
-
-            bld.provides(provider.serviceName(), provider.providers());
-        }
-
+                .version(version())
+                .packages(modFile.getSecureJar().getPackages());
+        modFile.getSecureJar().getProviders().stream()
+                .filter(p -> !p.providers().isEmpty())
+                .forEach(p -> bld.provides(p.serviceName(), p.providers()));
+        modFile.getModFileInfo().usesServices().forEach(bld::uses);
         descriptor = bld.build();
         return descriptor;
+    }
+
+    public IModFile modFile() {
+        return modFile;
     }
 
     @Override

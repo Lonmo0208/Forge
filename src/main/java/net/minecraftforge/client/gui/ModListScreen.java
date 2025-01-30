@@ -1,12 +1,12 @@
 /*
- * Copyright (c) Forge Development LLC and contributors
+ * Minecraft Forge - Forge Development LLC
  * SPDX-License-Identifier: LGPL-2.1-only
  */
 
 package net.minecraftforge.client.gui;
 
 import java.io.IOException;
-import java.nio.file.Files;
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -16,19 +16,20 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-import com.mojang.logging.LogUtils;
+import com.mojang.blaze3d.vertex.PoseStack;
 import net.minecraft.client.gui.narration.NarrationElementOutput;
-import net.minecraftforge.client.ConfigScreenHandler;
+import net.minecraft.client.renderer.GameRenderer;
 import net.minecraftforge.client.gui.widget.ModListWidget;
-import net.minecraftforge.client.gui.widget.ScrollPanel;
-import net.minecraftforge.fml.loading.moddiscovery.ModFileInfo;
+import net.minecraftforge.resource.PathResourcePack;
+import org.apache.commons.lang3.tuple.Pair;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.apache.maven.artifact.versioning.ComparableVersion;
 
 import com.mojang.blaze3d.systems.RenderSystem;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
-import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.components.Button;
@@ -47,20 +48,23 @@ import net.minecraftforge.common.util.MavenVersionStringHelper;
 import net.minecraftforge.fml.ModContainer;
 import net.minecraftforge.fml.ModList;
 import net.minecraftforge.fml.VersionChecker;
+import net.minecraftforge.client.ConfigGuiHandler;
 import net.minecraftforge.fml.loading.FMLPaths;
 import net.minecraftforge.fml.loading.StringUtils;
+import net.minecraftforge.resource.ResourcePackLoader;
 import net.minecraftforge.forgespi.language.IModInfo;
 
 import net.minecraft.locale.Language;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.Style;
-import org.slf4j.Logger;
+import net.minecraft.network.chat.TranslatableComponent;
 
-public class ModListScreen extends Screen {
-    private static final ResourceLocation LOGO = ResourceLocation.fromNamespaceAndPath("forge", "mod_logo");
+public class ModListScreen extends Screen
+{
     private static String stripControlCodes(String value) { return net.minecraft.util.StringUtil.stripColor(value); }
-    private static final Logger LOGGER = LogUtils.getLogger();
-    private enum SortType implements Comparator<IModInfo> {
+    private static final Logger LOGGER = LogManager.getLogger();
+    private enum SortType implements Comparator<IModInfo>
+    {
         NORMAL,
         A_TO_Z{ @Override protected int compare(String name1, String name2){ return name1.compareTo(name2); }},
         Z_TO_A{ @Override protected int compare(String name1, String name2){ return name2.compareTo(name1); }};
@@ -75,15 +79,13 @@ public class ModListScreen extends Screen {
         }
 
         Component getButtonText() {
-            return Component.translatable("fml.menu.mods." + StringUtils.toLowerCase(name()));
+            return new TranslatableComponent("fml.menu.mods." + StringUtils.toLowerCase(name()));
         }
     }
 
     private static final int PADDING = 6;
-    private static final int BUTTON_MARGIN = 1;
-    private static final int NUM_BUTTONS = SortType.values().length;
 
-    private final Screen parentScreen;
+    private Screen parentScreen;
 
     private ModListWidget modList;
     private InfoPanel modInfo;
@@ -93,6 +95,8 @@ public class ModListScreen extends Screen {
     private final List<IModInfo> unsortedMods;
     private Button configButton, openModsFolderButton, doneButton;
 
+    private int buttonMargin = 1;
+    private int numButtons = SortType.values().length;
     private String lastFilterText = "";
 
     private EditBox search;
@@ -100,11 +104,12 @@ public class ModListScreen extends Screen {
     private boolean sorted = false;
     private SortType sortType = SortType.NORMAL;
 
-    public ModListScreen(Screen parentScreen) {
-        super(Component.translatable("fml.menu.mods.title"));
+    public ModListScreen(Screen parentScreen)
+    {
+        super(new TranslatableComponent("fml.menu.mods.title"));
         this.parentScreen = parentScreen;
-        this.mods = ModList.get().getMods();
-        this.unsortedMods = List.copyOf(this.mods);
+        this.mods = Collections.unmodifiableList(ModList.get().getMods());
+        this.unsortedMods = Collections.unmodifiableList(this.mods);
     }
 
     class InfoPanel extends ScrollPanel {
@@ -112,26 +117,32 @@ public class ModListScreen extends Screen {
         private Size2i logoDims = new Size2i(0, 0);
         private List<FormattedCharSequence> lines = Collections.emptyList();
 
-        InfoPanel(Minecraft mcIn, int widthIn, int heightIn, int topIn) {
+        InfoPanel(Minecraft mcIn, int widthIn, int heightIn, int topIn)
+        {
             super(mcIn, widthIn, heightIn, topIn, modList.getRight() + PADDING);
         }
 
-        void setInfo(List<String> lines, ResourceLocation logoPath, Size2i logoDims) {
+        void setInfo(List<String> lines, ResourceLocation logoPath, Size2i logoDims)
+        {
             this.logoPath = logoPath;
             this.logoDims = logoDims;
             this.lines = resizeContent(lines);
         }
 
-        void clearInfo() {
+        void clearInfo()
+        {
             this.logoPath = null;
             this.logoDims = new Size2i(0, 0);
             this.lines = Collections.emptyList();
         }
 
-        private List<FormattedCharSequence> resizeContent(List<String> lines) {
+        private List<FormattedCharSequence> resizeContent(List<String> lines)
+        {
             List<FormattedCharSequence> ret = new ArrayList<>();
-            for (String line : lines) {
-                if (line == null) {
+            for (String line : lines)
+            {
+                if (line == null)
+                {
                     ret.add(null);
                     continue;
                 }
@@ -139,13 +150,16 @@ public class ModListScreen extends Screen {
                 Component chat = ForgeHooks.newChatWithLinks(line, false);
                 int maxTextLength = this.width - 12;
                 if (maxTextLength >= 0)
+                {
                     ret.addAll(Language.getInstance().getVisualOrder(font.getSplitter().splitLines(chat, maxTextLength, Style.EMPTY)));
+                }
             }
             return ret;
         }
 
         @Override
-        public int getContentHeight() {
+        public int getContentHeight()
+        {
             int height = 50;
             height += (lines.size() * font.lineHeight);
             if (height < this.bottom - this.top - 8)
@@ -154,52 +168,62 @@ public class ModListScreen extends Screen {
         }
 
         @Override
-        protected int getScrollAmount() {
+        protected int getScrollAmount()
+        {
             return font.lineHeight * 3;
         }
 
         @Override
-        protected void drawPanel(GuiGraphics guiGraphics, int entryRight, int relativeY, Tesselator tess, int mouseX, int mouseY) {
+        protected void drawPanel(PoseStack poseStack, int entryRight, int relativeY, Tesselator tess, int mouseX, int mouseY)
+        {
             if (logoPath != null) {
+                RenderSystem.setShader(GameRenderer::getPositionTexShader);
                 RenderSystem.enableBlend();
                 RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F);
+                RenderSystem.setShaderTexture(0, logoPath);
                 // Draw the logo image inscribed in a rectangle with width entryWidth (minus some padding) and height 50
                 int headerHeight = 50;
-                guiGraphics.blitInscribed(logoPath, left + PADDING, relativeY, width - (PADDING * 2), headerHeight, logoDims.width(), logoDims.height(), false, true);
+                GuiUtils.drawInscribedRect(poseStack, left + PADDING, relativeY, width - (PADDING * 2), headerHeight, logoDims.width, logoDims.height, false, true);
                 relativeY += headerHeight + PADDING;
             }
 
-            for (FormattedCharSequence line : lines) {
-                if (line != null) {
+            for (FormattedCharSequence line : lines)
+            {
+                if (line != null)
+                {
                     RenderSystem.enableBlend();
-                    guiGraphics.drawString(ModListScreen.this.font, line, left + PADDING, relativeY, 0xFFFFFF);
+                    ModListScreen.this.font.drawShadow(poseStack, line, left + PADDING, relativeY, 0xFFFFFF);
                     RenderSystem.disableBlend();
                 }
                 relativeY += font.lineHeight;
             }
 
             final Style component = findTextLine(mouseX, mouseY);
-            if (component!=null)
-                guiGraphics.renderComponentHoverEffect(ModListScreen.this.font, component, mouseX, mouseY);
+            if (component!=null) {
+                ModListScreen.this.renderComponentHoverEffect(poseStack, component, mouseX, mouseY);
+            }
         }
 
         private Style findTextLine(final int mouseX, final int mouseY) {
             if (!isMouseOver(mouseX, mouseY))
                 return null;
 
-            double offset = (mouseY - top - PADDING - border) + scrollDistance;
-            if (logoPath != null)
+            double offset = (mouseY - top) + border + scrollDistance + 1;
+            if (logoPath != null) {
                 offset -= 50;
+            }
             if (offset <= 0)
                 return null;
 
             int lineIdx = (int) (offset / font.lineHeight);
-            if (lineIdx >= lines.size() || lineIdx < 0)
+            if (lineIdx >= lines.size() || lineIdx < 1)
                 return null;
 
-            FormattedCharSequence line = lines.get(lineIdx);
+            FormattedCharSequence line = lines.get(lineIdx-1);
             if (line != null)
+            {
                 return font.getSplitter().componentStyleAtWidth(line, mouseX - left - border);
+            }
             return null;
         }
 
@@ -224,37 +248,30 @@ public class ModListScreen extends Screen {
     }
 
     @Override
-    public void init() {
-        for (IModInfo mod : mods) {
+    public void init()
+    {
+        for (IModInfo mod : mods)
+        {
             listWidth = Math.max(listWidth,getFontRenderer().width(mod.getDisplayName()) + 10);
             listWidth = Math.max(listWidth,getFontRenderer().width(MavenVersionStringHelper.artifactVersionToString(mod.getVersion())) + 5);
         }
-        listWidth = Math.max(Math.min(listWidth, width / 3), 100);
-        listWidth += listWidth % NUM_BUTTONS != 0 ? (NUM_BUTTONS - listWidth % NUM_BUTTONS) : 0;
+        listWidth = Math.max(Math.min(listWidth, width/3), 100);
+        listWidth += listWidth % numButtons != 0 ? (numButtons - listWidth % numButtons) : 0;
 
         int modInfoWidth = this.width - this.listWidth - (PADDING * 3);
         int doneButtonWidth = Math.min(modInfoWidth, 200);
         int y = this.height - 20 - PADDING;
         int fullButtonHeight = PADDING + 20 + PADDING;
 
-        doneButton = Button.builder(Component.translatable("gui.done"), b -> ModListScreen.this.onClose())
-                .bounds(((listWidth + PADDING + this.width - doneButtonWidth) / 2), y, doneButtonWidth, 20)
-                .build();
-
-        openModsFolderButton = Button.builder(Component.translatable("fml.menu.mods.openmodsfolder"), b -> Util.getPlatform().openFile(FMLPaths.MODSDIR.get().toFile()))
-                .bounds(6, y, this.listWidth, 20)
-                .build();
-
+        doneButton = new Button(((listWidth + PADDING + this.width - doneButtonWidth) / 2), y, doneButtonWidth, 20, new TranslatableComponent("gui.done"), b -> ModListScreen.this.onClose());
+        openModsFolderButton = new Button(6, y, this.listWidth, 20, new TranslatableComponent("fml.menu.mods.openmodsfolder"), b -> Util.getPlatform().openFile(FMLPaths.MODSDIR.get().toFile()));
         y -= 20 + PADDING;
-        configButton = Button.builder(Component.translatable("fml.menu.mods.config"), b -> ModListScreen.this.displayModConfig())
-                .bounds(6, y, this.listWidth, 20)
-                .build();
-
+        configButton = new Button(6, y, this.listWidth, 20, new TranslatableComponent("fml.menu.mods.config"), b -> ModListScreen.this.displayModConfig());
         y -= 14 + PADDING;
-        search = new EditBox(getFontRenderer(), PADDING + 1, y, listWidth - 2, 14, Component.translatable("fml.menu.mods.search"));
+        search = new EditBox(getFontRenderer(), PADDING + 1, y, listWidth - 2, 14, new TranslatableComponent("fml.menu.mods.search"));
 
-        this.modList = new ModListWidget(this, listWidth, fullButtonHeight, search.getY() - getFontRenderer().lineHeight * 4 - PADDING);
-        this.modList.setX(6);
+        this.modList = new ModListWidget(this, listWidth, fullButtonHeight, search.y - getFontRenderer().lineHeight - PADDING);
+        this.modList.setLeftPos(6);
         this.modInfo = new InfoPanel(this.minecraft, modInfoWidth, this.height - PADDING - fullButtonHeight, PADDING);
 
         this.addRenderableWidget(modList);
@@ -264,170 +281,157 @@ public class ModListScreen extends Screen {
         this.addRenderableWidget(configButton);
         this.addRenderableWidget(openModsFolderButton);
 
-        search.setFocused(false);
+        search.setFocus(false);
         search.setCanLoseFocus(true);
         configButton.active = false;
 
-        final int width = listWidth / NUM_BUTTONS;
+        final int width = listWidth / numButtons;
         int x = PADDING;
-        addRenderableWidget(SortType.NORMAL.button = Button.builder(SortType.NORMAL.getButtonText(), b -> resortMods(SortType.NORMAL))
-                .bounds(x, PADDING, width - BUTTON_MARGIN, 20)
-                .build());
-
-        x += width + BUTTON_MARGIN;
-        addRenderableWidget(SortType.A_TO_Z.button = Button.builder(SortType.A_TO_Z.getButtonText(), b -> resortMods(SortType.A_TO_Z))
-                .bounds(x, PADDING, width - BUTTON_MARGIN, 20)
-                .build());
-
-        x += width + BUTTON_MARGIN;
-        addRenderableWidget(SortType.Z_TO_A.button = Button.builder(SortType.Z_TO_A.getButtonText(), b -> resortMods(SortType.Z_TO_A))
-                .bounds(x, PADDING, width - BUTTON_MARGIN, 20)
-                .build());
-
+        addRenderableWidget(SortType.NORMAL.button = new Button(x, PADDING, width - buttonMargin, 20, SortType.NORMAL.getButtonText(), b -> resortMods(SortType.NORMAL)));
+        x += width + buttonMargin;
+        addRenderableWidget(SortType.A_TO_Z.button = new Button(x, PADDING, width - buttonMargin, 20, SortType.A_TO_Z.getButtonText(), b -> resortMods(SortType.A_TO_Z)));
+        x += width + buttonMargin;
+        addRenderableWidget(SortType.Z_TO_A.button = new Button(x, PADDING, width - buttonMargin, 20, SortType.Z_TO_A.getButtonText(), b -> resortMods(SortType.Z_TO_A)));
         resortMods(SortType.NORMAL);
         updateCache();
     }
 
-    private void displayModConfig() {
-        if (selected == null)
-            return;
-
-        try {
-            ConfigScreenHandler.getScreenFactoryFor(selected.getInfo())
-                    .map(f -> f.apply(this.minecraft, this))
-                    .ifPresent(newScreen -> this.minecraft.setScreen(newScreen));
-        } catch (final Exception e) {
+    private void displayModConfig()
+    {
+        if (selected == null) return;
+        try
+        {
+            ConfigGuiHandler.getGuiFactoryFor(selected.getInfo()).map(f->f.apply(this.minecraft, this)).ifPresent(newScreen -> this.minecraft.setScreen(newScreen));
+        }
+        catch (final Exception e)
+        {
             LOGGER.error("There was a critical issue trying to build the config GUI for {}", selected.getInfo().getModId(), e);
         }
     }
 
     @Override
-    public void tick() {
+    public void tick()
+    {
+        search.tick();
         modList.setSelected(selected);
 
-        if (!search.getValue().equals(lastFilterText)) {
+        if (!search.getValue().equals(lastFilterText))
+        {
             reloadMods();
             sorted = false;
         }
 
-        if (!sorted) {
+        if (!sorted)
+        {
             reloadMods();
             mods.sort(sortType);
             modList.refreshList();
-            if (selected != null) {
-                selected = modList.children().stream()
-                        .filter(e -> e.getInfo() == selected.getInfo())
-                        .findFirst()
-                        .orElse(null);
+            if (selected != null)
+            {
+                selected = modList.children().stream().filter(e -> e.getInfo() == selected.getInfo()).findFirst().orElse(null);
                 updateCache();
             }
             sorted = true;
         }
     }
 
-    public <T extends ObjectSelectionList.Entry<T>> void buildModList(Consumer<T> modListViewConsumer, Function<IModInfo, T> newEntry) {
-        for (IModInfo mod : mods) {
-            modListViewConsumer.accept(newEntry.apply(mod));
-        }
+    public <T extends ObjectSelectionList.Entry<T>> void buildModList(Consumer<T> modListViewConsumer, Function<IModInfo, T> newEntry)
+    {
+        mods.forEach(mod->modListViewConsumer.accept(newEntry.apply(mod)));
     }
 
-    private void reloadMods() {
-        this.mods = this.unsortedMods
-            .stream()
-            .filter(mi ->
-                StringUtils.toLowerCase(stripControlCodes(mi.getDisplayName()))
-                    .contains(StringUtils.toLowerCase(search.getValue()))
-            ).collect(Collectors.toList());
+    private void reloadMods()
+    {
+        this.mods = this.unsortedMods.stream().
+                filter(mi->StringUtils.toLowerCase(stripControlCodes(mi.getDisplayName())).contains(StringUtils.toLowerCase(search.getValue()))).collect(Collectors.toList());
         lastFilterText = search.getValue();
     }
 
-    private void resortMods(SortType newSort) {
+    private void resortMods(SortType newSort)
+    {
         this.sortType = newSort;
 
-        for (SortType sort : SortType.values()) {
+        for (SortType sort : SortType.values())
+        {
             if (sort.button != null)
                 sort.button.active = sortType != sort;
         }
-
         sorted = false;
     }
 
     @Override
-    public void render(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
-        this.modList.render(guiGraphics, mouseX, mouseY, partialTick);
+    public void render(PoseStack poseStack, int mouseX, int mouseY, float partialTick)
+    {
+        this.modList.render(poseStack, mouseX, mouseY, partialTick);
         if (this.modInfo != null)
-            this.modInfo.render(guiGraphics, mouseX, mouseY, partialTick);
+            this.modInfo.render(poseStack, mouseX, mouseY, partialTick);
 
-        Component text = Component.translatable("fml.menu.mods.search");
-        int x = modList.getX() + (modList.getWidth() / 2) - (getFontRenderer().width(text) / 2);
-        this.search.render(guiGraphics, mouseX , mouseY, partialTick);
-        super.render(guiGraphics, mouseX, mouseY, partialTick);
-        guiGraphics.drawString(getFontRenderer(), text.getVisualOrderText(), x, search.getY() - getFontRenderer().lineHeight, 0xFFFFFF, false);
+        Component text = new TranslatableComponent("fml.menu.mods.search");
+        int x = modList.getLeft() + ((modList.getRight() - modList.getLeft()) / 2) - (getFontRenderer().width(text) / 2);
+        this.search.render(poseStack, mouseX , mouseY, partialTick);
+        super.render(poseStack, mouseX, mouseY, partialTick);
+        getFontRenderer().draw(poseStack, text.getVisualOrderText(), x, search.y - getFontRenderer().lineHeight, 0xFFFFFF);
     }
 
-    public Minecraft getMinecraftInstance() {
+    public Minecraft getMinecraftInstance()
+    {
         return minecraft;
     }
 
-    public Font getFontRenderer() {
+    public Font getFontRenderer()
+    {
         return font;
     }
 
-    public void setSelected(ModListWidget.ModEntry entry) {
+    public void setSelected(ModListWidget.ModEntry entry)
+    {
         this.selected = entry == this.selected ? null : entry;
         updateCache();
     }
 
-    record Logo(ResourceLocation texture, Size2i size) {}
-    private static final Logo NONE = new Logo(null, new Size2i(0, 0));
-
-    private void updateCache() {
+    private void updateCache()
+    {
         if (selected == null) {
             this.configButton.active = false;
             this.modInfo.clearInfo();
             return;
         }
-
         IModInfo selectedMod = selected.getInfo();
-        this.configButton.active = ConfigScreenHandler.getScreenFactoryFor(selectedMod).isPresent();
+        this.configButton.active = ConfigGuiHandler.getGuiFactoryFor(selectedMod).isPresent();
         List<String> lines = new ArrayList<>();
         VersionChecker.CheckResult vercheck = VersionChecker.getResult(selectedMod);
 
-        var logoData = NONE;
-        var logoFile = selectedMod.getLogoFile().orElse(null);
-        if (logoFile != null) {
+        @SuppressWarnings("resource")
+        Pair<ResourceLocation, Size2i> logoData = selectedMod.getLogoFile().map(logoFile->
+        {
             TextureManager tm = this.minecraft.getTextureManager();
-
-            try {
+            final PathResourcePack resourcePack = ResourcePackLoader.getPackFor(selectedMod.getModId())
+                    .orElse(ResourcePackLoader.getPackFor("forge").
+                            orElseThrow(()->new RuntimeException("Can't find forge, WHAT!")));
+            try
+            {
                 NativeImage logo = null;
-                var modfile = ModList.get().getModFileById(selectedMod.getModId());
-                if (modfile != null) {
-                    var path = modfile.getFile().findResource(logoFile);
-                    if (Files.exists(path))
-                        logo = NativeImage.read(Files.newInputStream(path));
-                }
+                InputStream logoResource = resourcePack.getRootResource(logoFile);
+                if (logoResource != null)
+                    logo = NativeImage.read(logoResource);
+                if (logo != null)
+                {
 
-                if (logo != null) {
+                    return Pair.of(tm.register("modlogo", new DynamicTexture(logo) {
 
-                    var texture = new DynamicTexture(logo) {
                         @Override
                         public void upload() {
-                            var pixels = this.getPixels();
-                            if (pixels != null) {
-                                this.bind();
-                                // Use custom "blur" value which controls texture filtering (nearest-neighbor vs linear)
-                                pixels.upload(0, 0, 0, selectedMod.getLogoBlur());
-                            }
+                            this.bind();
+                            NativeImage td = this.getPixels();
+                            // Use custom "blur" value which controls texture filtering (nearest-neighbor vs linear)
+                            this.getPixels().upload(0, 0, 0, 0, 0, td.getWidth(), td.getHeight(), selectedMod.getLogoBlur(), false, false, false);
                         }
-                    };
-
-                    tm.register(LOGO, texture);
-                    var size = new Size2i(logo.getWidth(), logo.getHeight());
-
-                    logoData = new Logo(LOGO, size);
+                    }), new Size2i(logo.getWidth(), logo.getHeight()));
                 }
-            } catch (IOException e) { }
-        }
+            }
+            catch (IOException e) { }
+            return Pair.<ResourceLocation, Size2i>of(null, new Size2i(0, 0));
+        }).orElse(Pair.of(null, new Size2i(0, 0)));
 
         lines.add(selectedMod.getDisplayName());
         lines.add(ForgeI18n.parseMessage("fml.menu.mods.info.version", MavenVersionStringHelper.artifactVersionToString(selectedMod.getVersion())));
@@ -440,14 +444,14 @@ public class ModListScreen extends Screen {
                 lines.add(ForgeI18n.parseMessage("fml.menu.mods.info.authors", authors)));
         selectedMod.getConfig().getConfigElement("displayURL").ifPresent(displayURL ->
                 lines.add(ForgeI18n.parseMessage("fml.menu.mods.info.displayurl", displayURL)));
-        if (selectedMod.getOwningFile() == null || selectedMod.getOwningFile().getMods().size() == 1)
+        if (selectedMod.getOwningFile() == null || selectedMod.getOwningFile().getMods().size()==1)
             lines.add(ForgeI18n.parseMessage("fml.menu.mods.info.nochildmods"));
         else
             lines.add(ForgeI18n.parseMessage("fml.menu.mods.info.childmods", selectedMod.getOwningFile().getMods().stream().map(IModInfo::getDisplayName).collect(Collectors.joining(","))));
 
-        if (vercheck.status().isOutdated())
+        if (vercheck.status() == VersionChecker.Status.OUTDATED || vercheck.status() == VersionChecker.Status.BETA_OUTDATED)
             lines.add(ForgeI18n.parseMessage("fml.menu.mods.info.updateavailable", vercheck.url() == null ? "" : vercheck.url()));
-        lines.add(ForgeI18n.parseMessage("fml.menu.mods.info.license", ((ModFileInfo) selectedMod.getOwningFile()).getLicense()));
+        lines.add(ForgeI18n.parseMessage("fml.menu.mods.info.license", selectedMod.getOwningFile().getLicense()));
         lines.add(null);
         lines.add(selectedMod.getDescription());
 
@@ -461,39 +465,40 @@ public class ModListScreen extends Screen {
         }
         */
 
-        if ((vercheck.status().isOutdated()) && !vercheck.changes().isEmpty()) {
+        if ((vercheck.status() == VersionChecker.Status.OUTDATED || vercheck.status() == VersionChecker.Status.BETA_OUTDATED) && vercheck.changes().size() > 0)
+        {
             lines.add(null);
             lines.add(ForgeI18n.parseMessage("fml.menu.mods.info.changelogheader"));
-            for (Entry<ComparableVersion, String> entry : vercheck.changes().entrySet()) {
+            for (Entry<ComparableVersion, String> entry : vercheck.changes().entrySet())
+            {
                 lines.add("  " + entry.getKey() + ":");
                 lines.add(entry.getValue());
                 lines.add(null);
             }
         }
 
-        modInfo.setInfo(lines, logoData.texture(), logoData.size());
+        modInfo.setInfo(lines, logoData.getLeft(), logoData.getRight());
     }
 
     @Override
-    public void resize(Minecraft mc, int width, int height) {
+    public void resize(Minecraft mc, int width, int height)
+    {
         String s = this.search.getValue();
         SortType sort = this.sortType;
         ModListWidget.ModEntry selected = this.selected;
         this.init(mc, width, height);
         this.search.setValue(s);
         this.selected = selected;
-
         if (!this.search.getValue().isEmpty())
             reloadMods();
-
         if (sort != SortType.NORMAL)
             resortMods(sort);
-
         updateCache();
     }
 
     @Override
-    public void onClose() {
+    public void onClose()
+    {
         this.minecraft.setScreen(this.parentScreen);
     }
 }

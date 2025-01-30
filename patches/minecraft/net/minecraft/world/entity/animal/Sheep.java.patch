@@ -1,55 +1,41 @@
 --- a/net/minecraft/world/entity/animal/Sheep.java
 +++ b/net/minecraft/world/entity/animal/Sheep.java
-@@ -156,7 +_,7 @@
-     @Override
-     public InteractionResult mobInteract(Player p_29853_, InteractionHand p_29854_) {
-         ItemStack itemstack = p_29853_.getItemInHand(p_29854_);
--        if (itemstack.is(Items.SHEARS)) {
-+        if (false && itemstack.is(Items.SHEARS)) { // Forge: Moved to onSheared
-             if (this.level() instanceof ServerLevel serverlevel && this.readyForShearing()) {
-                 this.shear(serverlevel, SoundSource.PLAYERS, itemstack);
-                 this.gameEvent(GameEvent.SHEAR, p_29853_);
-@@ -172,12 +_,26 @@
+@@ -62,7 +_,7 @@
+ import net.minecraft.world.level.storage.loot.BuiltInLootTables;
+ import net.minecraft.world.phys.Vec3;
  
-     @Override
-     public void shear(ServerLevel p_365174_, SoundSource p_29819_, ItemStack p_361058_) {
-+        dropItems(p_365174_, shearInternal(p_365174_, p_29819_, p_361058_));
-+    }
-+
-+    private java.util.List<ItemStack> shearInternal(ServerLevel p_365174_, SoundSource p_29819_, ItemStack p_361058_) {
-+        var ret = new java.util.ArrayList<ItemStack>();
-         p_365174_.playSound(null, this, SoundEvents.SHEEP_SHEAR, p_29819_, 1.0F, 1.0F);
-         this.dropFromShearingLootTable(
-             p_365174_,
-             BuiltInLootTables.SHEAR_SHEEP,
-             p_361058_,
-             (p_359182_, p_359183_) -> {
-+                ret.add(p_359183_);
-+            }
-+        );
-+        this.setSheared(true);
-+        return ret;
-+    }
-+
-+    private void dropItems(ServerLevel p_359182_, java.util.Collection<ItemStack> items) {
-+            for (var p_359183_ : items) {
-                 for (int i = 0; i < p_359183_.getCount(); i++) {
-                     ItemEntity itementity = this.spawnAtLocation(p_359182_, p_359183_.copyWithCount(1), 1.0F);
-                     if (itementity != null) {
-@@ -192,8 +_,14 @@
-                     }
-                 }
-             }
--        );
--        this.setSheared(true);
-+    }
-+
-+    @Override
-+    public java.util.List<ItemStack> onSheared(@Nullable Player player, ItemStack item, Level world, BlockPos pos, int fortune) {
-+        if (world instanceof ServerLevel server) {
-+            return shearInternal(server, player == null ? SoundSource.BLOCKS : SoundSource.PLAYERS, item);
-+        }
-+        return java.util.Collections.emptyList();
-     }
+-public class Sheep extends Animal implements Shearable {
++public class Sheep extends Animal implements Shearable, net.minecraftforge.common.IForgeShearable {
+    private static final int f_149039_ = 40;
+    private static final EntityDataAccessor<Byte> f_29799_ = SynchedEntityData.m_135353_(Sheep.class, EntityDataSerializers.f_135027_);
+    private static final Map<DyeColor, Block> f_29800_ = Util.m_137469_(Maps.newEnumMap(DyeColor.class), (p_29841_) -> {
+@@ -215,7 +_,7 @@
  
-     @Override
+    public InteractionResult m_6071_(Player p_29853_, InteractionHand p_29854_) {
+       ItemStack itemstack = p_29853_.m_21120_(p_29854_);
+-      if (itemstack.m_150930_(Items.f_42574_)) {
++      if (false && itemstack.m_41720_() == Items.f_42574_) { //Forge: Moved to onSheared
+          if (!this.f_19853_.f_46443_ && this.m_6220_()) {
+             this.m_5851_(SoundSource.PLAYERS);
+             this.m_146852_(GameEvent.f_157781_, p_29853_);
+@@ -360,6 +_,20 @@
+ 
+    protected float m_6431_(Pose p_29850_, EntityDimensions p_29851_) {
+       return 0.95F * p_29851_.f_20378_;
++   }
++
++   @Override
++   public boolean isShearable(@javax.annotation.Nonnull ItemStack item, Level world, BlockPos pos) {
++      return m_6220_();
++   }
++
++   @javax.annotation.Nonnull
++   @Override
++   public java.util.List<ItemStack> onSheared(@Nullable Player player, @javax.annotation.Nonnull ItemStack item, Level world, BlockPos pos, int fortune) {
++      this.m_5851_(SoundSource.PLAYERS);
++      this.m_146852_(GameEvent.f_157781_, player);
++
++      return java.util.Collections.emptyList();
+    }
+ 
+    public void m_8119_() {

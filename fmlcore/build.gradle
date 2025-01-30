@@ -1,67 +1,64 @@
-import net.minecraftforge.gradleutils.PomUtils
-
 plugins {
-    id 'java-library'
-    id 'maven-publish'
-    id 'net.minecraftforge.licenser'
-    id 'net.minecraftforge.gradleutils'
+    id 'com.github.ben-manes.versions'
+    id 'org.javamodularity.moduleplugin' version '1.8.3' apply false
 }
+apply plugin: 'java-library'
+apply plugin: 'jacoco'
+apply plugin: 'org.javamodularity.moduleplugin'
 
-apply from: rootProject.file('build_shared.gradle')
+dependencyUpdates.rejectVersionIf { isNonStable(it.candidate.version) }
 
 dependencies {
-    compileOnly(libs.nulls)
-
-    api(libs.eventbus)
-
+    compileOnly('org.jetbrains:annotations:21.0.1')
     implementation(project(':fmlloader'))
-    implementation(libs.commons.io)
+    api('net.minecraftforge:eventbus:5.0.+')
+    implementation('commons-io:commons-io:2.5')
 }
 
-java {
-    toolchain.languageVersion = JavaLanguageVersion.of(JAVA_VERSION)
-    withSourcesJar()
+task sourcesJar(type: Jar) {
+    archiveClassifier = 'sources'
+    from sourceSets.main.allSource
 }
 
-tasks.named('jar', Jar).configure {
-    manifest {
-        attributes([
-            'Automatic-Module-Name': 'net.minecraftforge.fmlcore',
-            'FMLModType': 'LIBRARY'
-        ] as LinkedHashMap)
-        attributes([
-            'Specification-Title':      'FML',
+ext {
+    MANIFESTS = [
+        '': [
+            'FMLModType': 'LIBRARY',
+            'Timestamp': new Date().format("yyyy-MM-dd'T'HH:mm:ssZ"),
+            'Git-Commit': GIT_INFO.abbreviatedId,
+            'Git-Branch': GIT_INFO.branch,
+            'Build-Number': "${System.getenv('BUILD_NUMBER')?:0}"
+        ] as LinkedHashMap,
+        'net/minecraftforge/fml/loading/': [
+            'Specification-Title':      'FMLLoader',
             'Specification-Vendor':     'Forge Development LLC',
             'Specification-Version':    '1',
-            'Implementation-Title':     'FML',
+            'Implementation-Title':     'FML Loader',
             'Implementation-Version':   '1.0',
-            'Implementation-Vendor':    'Forge Development LLC'
-        ] as LinkedHashMap, 'net/minecraftforge/fml/')
+            'Implementation-Vendor':    'Forge'
+        ] as LinkedHashMap
+    ]
+}
+
+jar.doFirst {
+    MANIFESTS.each { pkg, values ->
+        if (pkg == '')
+            manifest.attributes(values)
+        else
+            manifest.attributes(values, pkg)
     }
 }
 
-tasks.withType(JavaCompile).configureEach {
-    options.compilerArgs << '-Xlint:-unchecked'
+tasks.withType(JavaCompile) {
+    options.compilerArgs << '-Xlint:unchecked'
 }
 
-license {
-    header = rootProject.file('LICENSE-header.txt')
+artifacts {
+    archives jar
+    archives sourcesJar
 }
 
-publishing {
-    publications.register('mavenJava', MavenPublication).configure {
-        from components.java
-        artifactId = 'fmlcore'
-        pom {
-            name = project.name
-            description = 'Modifactions to Minecraft to enable mod developers.'
-            url = 'https://github.com/MinecraftForge/MinecraftForge'
-            PomUtils.setGitHubDetails(pom, 'MinecraftForge')
-            license PomUtils.Licenses.LGPLv2_1
-        }
-    }
-    
-    repositories {
-        maven gradleutils.publishingForgeMaven
-    }
+publishing.publications.mavenJava(MavenPublication) {
+    from components.java
+    artifact sourcesJar
 }

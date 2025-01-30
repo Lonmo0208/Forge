@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Forge Development LLC and contributors
+ * Minecraft Forge - Forge Development LLC
  * SPDX-License-Identifier: LGPL-2.1-only
  */
 
@@ -10,7 +10,8 @@ import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.item.ItemStack;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.eventbus.api.Cancelable;
-import org.jetbrains.annotations.NotNull;
+
+import javax.annotation.Nonnull;
 
 /**
  * {@link LivingEquipmentChangeEvent} is fired when the Equipment of a Entity changes. <br>
@@ -28,29 +29,23 @@ import org.jetbrains.annotations.NotNull;
  * <br>
  * This event is fired on the {@link MinecraftForge#EVENT_BUS}.
  **/
-public class LivingEquipmentChangeEvent extends LivingEvent {
+public class LivingEquipmentChangeEvent extends LivingEvent
+{
     private final EquipmentSlot slot;
     private final ItemStack from;
     private final ItemStack to;
 
-    public LivingEquipmentChangeEvent(LivingEntity entity, EquipmentSlot slot, @NotNull ItemStack from, @NotNull ItemStack to) {
+    public LivingEquipmentChangeEvent(LivingEntity entity, EquipmentSlot slot, @Nonnull ItemStack from, @Nonnull ItemStack to)
+    {
         super(entity);
         this.slot = slot;
         this.from = from;
         this.to = to;
     }
 
-    public EquipmentSlot getSlot() {
-        return this.slot;
-    }
-
-    @NotNull
-    public ItemStack getFrom() {
-        return this.from;
-    }
-
-    @NotNull
-    public ItemStack getTo() {
-        return this.to;
-    }
+    public EquipmentSlot getSlot() { return this.slot; }
+    @Nonnull
+    public ItemStack getFrom() { return this.from; }
+    @Nonnull
+    public ItemStack getTo() { return this.to; }
 }

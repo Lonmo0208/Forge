@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Forge Development LLC and contributors
+ * Minecraft Forge - Forge Development LLC
  * SPDX-License-Identifier: LGPL-2.1-only
  */
 
@@ -21,14 +21,17 @@ import net.minecraftforge.fml.event.IModBusEvent;
  * <br>
  * Fired on the Mod bus {@link IModBusEvent}.<br>
  **/
-public class EntityAttributeCreationEvent extends Event implements IModBusEvent {
+public class EntityAttributeCreationEvent extends Event implements IModBusEvent
+{
     private final Map<EntityType<? extends LivingEntity>, AttributeSupplier> map;
 
-    public EntityAttributeCreationEvent(Map<EntityType<? extends LivingEntity>, AttributeSupplier> map) {
+    public EntityAttributeCreationEvent(Map<EntityType<? extends LivingEntity>, AttributeSupplier> map)
+    {
         this.map = map;
     }
 
-    public void put(EntityType<? extends LivingEntity> entity, AttributeSupplier map) {
+    public void put(EntityType<? extends LivingEntity> entity, AttributeSupplier map)
+    {
         if (DefaultAttributes.hasSupplier(entity))
             throw new IllegalStateException("Duplicate DefaultAttributes entry: " + entity);
         this.map.put(entity, map);

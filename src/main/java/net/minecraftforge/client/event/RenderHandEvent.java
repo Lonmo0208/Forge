@@ -1,31 +1,24 @@
 /*
- * Copyright (c) Forge Development LLC and contributors
+ * Minecraft Forge - Forge Development LLC
  * SPDX-License-Identifier: LGPL-2.1-only
  */
 
 package net.minecraftforge.client.event;
 
+import javax.annotation.Nonnull;
+
 import com.mojang.blaze3d.vertex.PoseStack;
-import net.minecraft.client.renderer.LightTexture;
+
 import net.minecraft.client.renderer.MultiBufferSource;
-import net.minecraft.world.InteractionHand;
 import net.minecraft.world.item.ItemStack;
-import net.minecraftforge.common.MinecraftForge;
+import net.minecraft.world.InteractionHand;
 import net.minecraftforge.eventbus.api.Cancelable;
 import net.minecraftforge.eventbus.api.Event;
-import net.minecraftforge.fml.LogicalSide;
-import org.jetbrains.annotations.ApiStatus;
 
 /**
- * Fired before a hand is rendered in the first person view.
- *
- * <p>This event is {@linkplain Cancelable cancellable}, and does not {@linkplain HasResult have a result}.
- * If this event is cancelled, then the hand will not be rendered.</p>
- *
- * <p>This event is fired on the {@linkplain MinecraftForge#EVENT_BUS main Forge event bus},
- * only on the {@linkplain LogicalSide#CLIENT logical client}.</p>
- *
- * @see RenderArmEvent
+ * This event is fired on the {@link net.minecraftforge.common.MinecraftForge#EVENT_BUS}
+ * whenever a hand is rendered in first person.
+ * Canceling the event causes the hand to not render.
  */
 @Cancelable
 public class RenderHandEvent extends Event
@@ -34,72 +27,53 @@ public class RenderHandEvent extends Event
     private final PoseStack poseStack;
     private final MultiBufferSource multiBufferSource;
     private final int packedLight;
-    private final float partialTick;
+    private final float partialTicks;
     private final float interpolatedPitch;
     private final float swingProgress;
     private final float equipProgress;
+    @Nonnull
     private final ItemStack stack;
 
-    @ApiStatus.Internal
     public RenderHandEvent(InteractionHand hand, PoseStack poseStack, MultiBufferSource multiBufferSource, int packedLight,
-                           float partialTick, float interpolatedPitch,
-                           float swingProgress, float equipProgress, ItemStack stack)
+                           float partialTicks, float interpolatedPitch,
+                           float swingProgress, float equipProgress, @Nonnull ItemStack stack)
     {
         this.hand = hand;
         this.poseStack = poseStack;
         this.multiBufferSource = multiBufferSource;
         this.packedLight = packedLight;
-        this.partialTick = partialTick;
+        this.partialTicks = partialTicks;
         this.interpolatedPitch = interpolatedPitch;
         this.swingProgress = swingProgress;
         this.equipProgress = equipProgress;
         this.stack = stack;
     }
 
-    /**
-     * {@return the hand being rendered}
-     */
     public InteractionHand getHand()
     {
         return hand;
     }
 
-    /**
-     * {@return the pose stack used for rendering}
-     */
     public PoseStack getPoseStack()
     {
         return poseStack;
     }
 
-    /**
-     * {@return the source of rendering buffers}
-     */
-    public MultiBufferSource getMultiBufferSource()
-    {
+    public MultiBufferSource getMultiBufferSource() {
         return multiBufferSource;
     }
 
-    /**
-     * {@return the amount of packed (sky and block) light for rendering}
-     *
-     * @see LightTexture
-     */
-    public int getPackedLight()
-    {
+    public int getPackedLight() {
         return packedLight;
     }
 
-    /**
-     * {@return the partial tick}
-     */
-    public float getPartialTick()
+    public float getPartialTicks()
     {
-        return partialTick;
+        return partialTicks;
     }
 
     /**
-     * {@return the interpolated pitch of the player entity}
+     * @return The interpolated pitch of the player entity
      */
     public float getInterpolatedPitch()
     {
@@ -107,7 +81,7 @@ public class RenderHandEvent extends Event
     }
 
     /**
-     * {@return the swing progress of the hand being rendered}
+     * @return The swing progress of the hand being rendered
      */
     public float getSwingProgress()
     {
@@ -115,7 +89,7 @@ public class RenderHandEvent extends Event
     }
 
     /**
-     * {@return the progress of the equip animation, from {@code 0.0} to {@code 1.0}}
+     * @return The progress of the equip animation. 1.0 is fully equipped.
      */
     public float getEquipProgress()
     {
@@ -123,8 +97,9 @@ public class RenderHandEvent extends Event
     }
 
     /**
-     * {@return the item stack to be rendered}
+     * @return The ItemStack to be rendered
      */
+    @Nonnull
     public ItemStack getItemStack()
     {
         return stack;

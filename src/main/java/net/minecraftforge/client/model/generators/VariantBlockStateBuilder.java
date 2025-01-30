@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Forge Development LLC and contributors
+ * Minecraft Forge - Forge Development LLC
  * SPDX-License-Identifier: LGPL-2.1-only
  */
 
@@ -20,6 +20,8 @@ import java.util.TreeSet;
 import java.util.function.Function;
 import java.util.function.Predicate;
 
+import javax.annotation.Nullable;
+
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
@@ -30,7 +32,6 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.Property;
 import net.minecraftforge.client.model.generators.BlockStateProvider.ConfiguredModelList;
-import org.jetbrains.annotations.Nullable;
 
 /**
  * Builder for variant-type blockstates, i.e. non-multipart blockstates. Should
@@ -48,16 +49,10 @@ import org.jetbrains.annotations.Nullable;
  * {@link #forAllStatesExcept(Function, Property...)} for cases where the model
  * for each variant can be decided dynamically based on the state's property
  * values.
- *
+ * 
  * @see BlockStateProvider
- *
- * In 1.21.4 Mojang exposed their data generators for their models. So it should be feasible to just use theirs.
- * If you find something lacking feel free to open a PR so that we can extend it.
- * @deprecated Use Vanilla's providers {@link net.minecraft.client.data.models.ModelProvider}
  */
-@Deprecated(since = "1.21.4", forRemoval = true)
-public class VariantBlockStateBuilder implements IGeneratedBlockState
-{
+public class VariantBlockStateBuilder implements IGeneratedBlockstate {
 
     private final Block owner;
     private final Map<PartialBlockstate, ConfiguredModelList> models = new LinkedHashMap<>();
@@ -91,7 +86,7 @@ public class VariantBlockStateBuilder implements IGeneratedBlockState
 
     /**
      * Assign some models to a given {@link PartialBlockstate partial state}.
-     *
+     * 
      * @param state  The {@link PartialBlockstate partial state} for which to add
      *               the models
      * @param models A set of models to add to this state
@@ -125,7 +120,7 @@ public class VariantBlockStateBuilder implements IGeneratedBlockState
      * Assign some models to a given {@link PartialBlockstate partial state},
      * throwing an exception if the state has already been configured. Otherwise,
      * simply calls {@link #addModels(PartialBlockstate, ConfiguredModel...)}.
-     *
+     * 
      * @param state  The {@link PartialBlockstate partial state} for which to set
      *               the models
      * @param model A set of models to assign to this state
@@ -204,7 +199,7 @@ public class VariantBlockStateBuilder implements IGeneratedBlockState
          * Creates a builder for models to assign to this state, which when completed
          * via {@link ConfiguredModel.Builder#addModel()} will assign the resultant set
          * of models to this state.
-         *
+         * 
          * @return the model builder
          * @see ConfiguredModel.Builder
          */
@@ -217,7 +212,7 @@ public class VariantBlockStateBuilder implements IGeneratedBlockState
          * Add models to the current state's variant. For use when it is more convenient
          * to add multiple sets of models, as a replacement for
          * {@link #setModels(ConfiguredModel...)}.
-         *
+         * 
          * @param models The models to add.
          * @return {@code this}
          * @throws NullPointerException If the parent builder is {@code null}
@@ -230,7 +225,7 @@ public class VariantBlockStateBuilder implements IGeneratedBlockState
 
         /**
          * Set this variant's models, and return the parent builder.
-         *
+         * 
          * @param models The models to set
          * @return The parent builder instance
          * @throws NullPointerException If the parent builder is {@code null}
@@ -244,7 +239,7 @@ public class VariantBlockStateBuilder implements IGeneratedBlockState
          * Complete this state without adding any new models, and return a new partial
          * state via the parent builder. For use after calling
          * {@link #addModels(ConfiguredModel...)}.
-         *
+         * 
          * @return A fresh partial state as specified by
          *         {@link VariantBlockStateBuilder#partialState()}.
          * @throws NullPointerException If the parent builder is {@code null}
@@ -289,12 +284,11 @@ public class VariantBlockStateBuilder implements IGeneratedBlockState
             return true;
         }
 
-        @SuppressWarnings({ "unchecked", "rawtypes" })
         @Override
         public String toString() {
             StringBuilder ret = new StringBuilder();
             for (Map.Entry<Property<?>, Comparable<?>> entry : setStates.entrySet()) {
-                if (!ret.isEmpty()) {
+                if (ret.length() > 0) {
                     ret.append(',');
                 }
                 ret.append(entry.getKey().getName())

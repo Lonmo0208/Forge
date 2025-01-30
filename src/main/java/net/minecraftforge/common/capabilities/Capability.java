@@ -1,16 +1,17 @@
 /*
- * Copyright (c) Forge Development LLC and contributors
+ * Minecraft Forge - Forge Development LLC
  * SPDX-License-Identifier: LGPL-2.1-only
  */
 
 package net.minecraftforge.common.capabilities;
 
 import net.minecraftforge.common.util.LazyOptional;
-import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
+
+import javax.annotation.Nonnull;
 
 /**
  * This is the core holder object Capabilities.
@@ -19,16 +20,16 @@ import java.util.function.Consumer;
  *
  * The CapabilityManager is in charge of creating this class.
  */
-public final class Capability<T> {
+public class Capability<T>
+{
     /**
      * @return The unique name of this capability, typically this is
      * the fully qualified class name for the target interface.
      */
-    public String getName() {
-        return name;
-    }
+    public String getName() { return name; }
 
-    public @NotNull <R> LazyOptional<R> orEmpty(Capability<R> toCheck, LazyOptional<T> inst) {
+    public @Nonnull <R> LazyOptional<R> orEmpty(Capability<R> toCheck, LazyOptional<T> inst)
+    {
         return this == toCheck ? inst.cast() : LazyOptional.empty();
     }
 
@@ -36,7 +37,8 @@ public final class Capability<T> {
      * @return true if something has registered this capability to the Manager.
      *   This is a marker that the class for this capability exists, and can be used.
      */
-    public boolean isRegistered() {
+    public boolean isRegistered()
+    {
         return this.listeners == null;
     }
 
@@ -47,7 +49,8 @@ public final class Capability<T> {
      * @param listener Function to fire when capability is registered.
      * @return self, in case people want to use builder pattern.
      */
-    public synchronized Capability<T> addListener(Consumer<Capability<T>> listener) {
+    public synchronized Capability<T> addListener(Consumer<Capability<T>> listener)
+    {
         if (this.isRegistered())
             listener.accept(this);
         else
@@ -59,11 +62,13 @@ public final class Capability<T> {
     private final String name;
     List<Consumer<Capability<T>>> listeners = new ArrayList<>();
 
-    Capability(String name) {
+    Capability(String name)
+    {
         this.name = name;
     }
 
-    void onRegister() {
+    void onRegister()
+    {
         var listeners = this.listeners;
         this.listeners = null;
         listeners.forEach(l -> l.accept(this));

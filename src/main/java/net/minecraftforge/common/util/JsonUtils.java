@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Forge Development LLC and contributors
+ * Minecraft Forge - Forge Development LLC
  * SPDX-License-Identifier: LGPL-2.1-only
  */
 
@@ -26,7 +26,8 @@ import com.mojang.brigadier.exceptions.CommandSyntaxException;
 
 import net.minecraft.nbt.TagParser;
 import net.minecraft.nbt.CompoundTag;
-import org.jetbrains.annotations.Nullable;
+
+import javax.annotation.Nullable;
 
 public class JsonUtils
 {

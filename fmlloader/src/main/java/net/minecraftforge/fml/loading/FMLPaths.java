@@ -1,16 +1,28 @@
 /*
- * Copyright (c) Forge Development LLC and contributors
- * SPDX-License-Identifier: LGPL-2.1-only
+ * Minecraft Forge
+ * Copyright (c) 2016-2021.
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation version 2.1
+ * of the License.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
 package net.minecraftforge.fml.loading;
 
-import com.mojang.logging.LogUtils;
 import cpw.mods.modlauncher.api.IEnvironment;
-import org.slf4j.Logger;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
-import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Arrays;
@@ -24,7 +36,7 @@ public enum FMLPaths
     CONFIGDIR("config"),
     FMLCONFIG(false, CONFIGDIR, "fml.toml");
 
-    private static final Logger LOGGER = LogUtils.getLogger();
+    private static final Logger LOGGER = LogManager.getLogger();
     private final Path relativePath;
     private final boolean isDirectory;
     private Path absolutePath;
@@ -59,33 +71,16 @@ public enum FMLPaths
         for (FMLPaths path : FMLPaths.values())
         {
             path.absolutePath = rootPath.resolve(path.relativePath).toAbsolutePath().normalize();
-            if (path.isDirectory && !Files.isDirectory(path.absolutePath))
+            if (path.isDirectory)
             {
-                try {
-                   Files.createDirectories(path.absolutePath);
-                } catch (IOException e) {
-                   throw new RuntimeException(e);
-                }
+                FileUtils.getOrCreateDirectory(path.absolutePath, path.name());
             }
-            if (LOGGER.isDebugEnabled(CORE))
-            {
-                LOGGER.debug(CORE, "Path {} is {}", path, path.absolutePath);
-            }
+            LOGGER.debug(CORE,"Path {} is {}", ()-> path, ()-> path.absolutePath);
         }
     }
 
-    public static Path getOrCreateGameRelativePath(Path path) {
-        Path gameFolderPath = FMLPaths.GAMEDIR.get().resolve(path);
-
-        if (!Files.isDirectory(gameFolderPath)) {
-            try {
-                Files.createDirectories(gameFolderPath);
-            } catch (IOException e) {
-                throw new RuntimeException(e);
-            }
-        }
-
-        return gameFolderPath;
+    public static Path getOrCreateGameRelativePath(Path path, String name) {
+        return FileUtils.getOrCreateDirectory(FMLPaths.GAMEDIR.get().resolve(path), name);
     }
 
     public Path relative() {

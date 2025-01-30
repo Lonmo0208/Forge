@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Forge Development LLC and contributors
+ * Minecraft Forge - Forge Development LLC
  * SPDX-License-Identifier: LGPL-2.1-only
  */
 
@@ -9,6 +9,7 @@ import net.minecraft.core.Holder;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.tags.TagKey;
 import net.minecraftforge.registries.DeferredRegister;
+import net.minecraftforge.registries.IForgeRegistryEntry;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.Optional;
@@ -20,7 +21,8 @@ import java.util.stream.Stream;
  * A tag manager holds information about all tags currently bound to a forge registry.
  * This should be preferred to any {@link Holder}-related methods.
  */
-public interface ITagManager<V> extends Iterable<ITag<V>> {
+public interface ITagManager<V extends IForgeRegistryEntry<V>> extends Iterable<ITag<V>>
+{
     /**
      * Queries this tag manager for a tag with the given tag key.
      * If it does not exist, this will create an empty tag and return it.

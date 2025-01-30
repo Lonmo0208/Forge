@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Forge Development LLC and contributors
+ * Minecraft Forge - Forge Development LLC
  * SPDX-License-Identifier: LGPL-2.1-only
  */
 
@@ -22,12 +22,14 @@ import java.util.List;
  * The hook will still take the damage specified
  */
 @Cancelable
-public class ItemFishedEvent extends PlayerEvent {
+public class ItemFishedEvent extends PlayerEvent
+{
     private final NonNullList<ItemStack> stacks = NonNullList.create();
     private final FishingHook hook;
     private int rodDamage;
 
-    public ItemFishedEvent(List<ItemStack> stacks, int rodDamage, FishingHook hook) {
+    public ItemFishedEvent(List<ItemStack> stacks, int rodDamage, FishingHook hook)
+    {
         super(hook.getPlayerOwner());
         this.stacks.addAll(stacks);
         this.rodDamage = rodDamage;
@@ -38,7 +40,8 @@ public class ItemFishedEvent extends PlayerEvent {
      * Get the damage the rod will take.
      * @return The damage the rod will take
      */
-    public int getRodDamage() {
+    public int getRodDamage()
+    {
         return rodDamage;
     }
 
@@ -47,7 +50,8 @@ public class ItemFishedEvent extends PlayerEvent {
      * This is not added to the pre-existing damage to be taken.
      * @param rodDamage The damage the rod will take. Must be nonnegative
      */
-    public void damageRodBy(@Nonnegative int rodDamage) {
+    public void damageRodBy(@Nonnegative int rodDamage)
+    {
         Preconditions.checkArgument(rodDamage >= 0);
         this.rodDamage = rodDamage;
     }
@@ -57,14 +61,16 @@ public class ItemFishedEvent extends PlayerEvent {
      * You cannot use this to modify the drops the player will get.
      * If you want to affect the loot, you should use LootTables.
      */
-    public NonNullList<ItemStack> getDrops() {
+    public NonNullList<ItemStack> getDrops()
+    {
         return stacks;
     }
 
     /**
      * Use this to stuff related to the hook itself, like the position of the bobber.
      */
-    public FishingHook getHookEntity() {
+    public FishingHook getHookEntity()
+    {
         return hook;
     }
 }

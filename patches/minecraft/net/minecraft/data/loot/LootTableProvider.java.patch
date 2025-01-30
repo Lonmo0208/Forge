@@ -1,53 +1,47 @@
 --- a/net/minecraft/data/loot/LootTableProvider.java
 +++ b/net/minecraft/data/loot/LootTableProvider.java
-@@ -62,7 +_,7 @@
-     private CompletableFuture<?> run(CachedOutput p_327970_, HolderLookup.Provider p_331092_) {
-         WritableRegistry<LootTable> writableregistry = new MappedRegistry<>(Registries.LOOT_TABLE, Lifecycle.experimental());
-         Map<RandomSupport.Seed128bit, ResourceLocation> map = new Object2ObjectOpenHashMap<>();
--        this.subProviders.forEach(p_341016_ -> p_341016_.provider().apply(p_331092_).generate((p_358218_, p_358219_) -> {
-+        this.getTables().forEach(p_341016_ -> p_341016_.provider().apply(p_331092_).generate((p_358218_, p_358219_) -> {
-                 ResourceLocation resourcelocation = sequenceIdForLootTable(p_358218_);
-                 ResourceLocation resourcelocation1 = map.put(RandomSequence.seedForKey(resourcelocation), resourcelocation);
-                 if (resourcelocation1 != null) {
-@@ -78,18 +_,8 @@
-         HolderGetter.Provider holdergetter$provider = new RegistryAccess.ImmutableRegistryAccess(List.of(writableregistry)).freeze();
-         ValidationContext validationcontext = new ValidationContext(problemreporter$collector, LootContextParamSets.ALL_PARAMS, holdergetter$provider);
+@@ -40,7 +_,7 @@
+    public void m_6865_(HashCache p_124444_) {
+       Path path = this.f_124433_.m_123916_();
+       Map<ResourceLocation, LootTable> map = Maps.newHashMap();
+-      this.f_124434_.forEach((p_124458_) -> {
++      this.getTables().forEach((p_124458_) -> {
+          p_124458_.getFirst().get().accept((p_176077_, p_176078_) -> {
+             if (map.put(p_176077_, p_176078_.m_79165_(p_124458_.getSecond()).m_79167_()) != null) {
+                throw new IllegalStateException("Duplicate loot table " + p_176077_);
+@@ -51,13 +_,8 @@
+          return null;
+       }, map::get);
  
--        for (ResourceKey<LootTable> resourcekey : Sets.difference(this.requiredTables, writableregistry.registryKeySet())) {
--            problemreporter$collector.report("Missing built-in table: " + resourcekey.location());
--        }
-+        validate(writableregistry, validationcontext, problemreporter$collector);
+-      for(ResourceLocation resourcelocation : Sets.difference(BuiltInLootTables.m_78766_(), map.keySet())) {
+-         validationcontext.m_79357_("Missing built-in table: " + resourcelocation);
+-      }
++      validate(map, validationcontext);
  
--        writableregistry.listElements()
--            .forEach(
--                p_358221_ -> p_358221_.value()
--                        .validate(
--                            validationcontext.setContextKeySet(p_358221_.value().getParamSet())
--                                .enterElement("{" + p_358221_.key().location() + "}", p_358221_.key())
--                        )
--            );
-         Multimap<String, String> multimap = problemreporter$collector.get();
-         if (!multimap.isEmpty()) {
-             multimap.forEach((p_124446_, p_124447_) -> LOGGER.warn("Found validation problem in {}: {}", p_124446_, p_124447_));
-@@ -111,6 +_,21 @@
-     @Override
-     public final String getName() {
-         return "Loot Tables";
-+    }
-+
-+    public List<LootTableProvider.SubProviderEntry> getTables() {
-+        return this.subProviders;
-+    }
-+
-+    protected void validate(net.minecraft.core.Registry<LootTable> map, ValidationContext validationcontext, ProblemReporter report) {
-+        for (ResourceKey<LootTable> resourcekey : Sets.difference(this.requiredTables, map.registryKeySet())) {
-+            report.report("Missing built-in table: " + resourcekey.location());
-+        }
-+
-+        map.listElements().forEach(table -> table.value().validate(
-+            validationcontext.setContextKeySet(table.value().getParamSet())
-+                .enterElement("{" + table.key().location() + "}", table.key())
-+        ));
-     }
+-      map.forEach((p_124441_, p_124442_) -> {
+-         LootTables.m_79202_(validationcontext, p_124441_, p_124442_);
+-      });
+       Multimap<String, String> multimap = validationcontext.m_79352_();
+       if (!multimap.isEmpty()) {
+          multimap.forEach((p_124446_, p_124447_) -> {
+@@ -76,6 +_,20 @@
  
-     public static record SubProviderEntry(Function<HolderLookup.Provider, LootTableSubProvider> provider, ContextKeySet paramSet) {
+          });
+       }
++   }
++
++   protected List<Pair<Supplier<Consumer<BiConsumer<ResourceLocation, LootTable.Builder>>>, LootContextParamSet>> getTables() {
++      return f_124434_;
++   }
++
++   protected void validate(Map<ResourceLocation, LootTable> map, ValidationContext validationtracker) {
++      for(ResourceLocation resourcelocation : Sets.difference(BuiltInLootTables.m_78766_(), map.keySet())) {
++         validationtracker.m_79357_("Missing built-in table: " + resourcelocation);
++      }
++
++      map.forEach((p_218436_2_, p_218436_3_) -> {
++         LootTables.m_79202_(validationtracker, p_218436_2_, p_218436_3_);
++      });
+    }
+ 
+    private static Path m_124453_(Path p_124454_, ResourceLocation p_124455_) {

@@ -1,13 +1,13 @@
 /*
- * Copyright (c) Forge Development LLC and contributors
+ * Minecraft Forge - Forge Development LLC
  * SPDX-License-Identifier: LGPL-2.1-only
  */
 
 package net.minecraftforge.fluids.capability;
 
-import net.minecraftforge.common.capabilities.AutoRegisterCapability;
+import javax.annotation.Nonnull;
+
 import net.minecraftforge.fluids.*;
-import org.jetbrains.annotations.NotNull;
 
 /**
  * Implement this interface as a capability which should handle fluids, generally storing them in
@@ -15,7 +15,6 @@ import org.jetbrains.annotations.NotNull;
  * <p>
  * A reference implementation is provided {@link TileFluidHandler}.
  */
-@AutoRegisterCapability
 public interface IFluidHandler
 {
     enum FluidAction {
@@ -53,7 +52,7 @@ public interface IFluidHandler
      * @param tank Tank to query.
      * @return FluidStack in a given tank. FluidStack.EMPTY if the tank is empty.
      */
-    @NotNull
+    @Nonnull
     FluidStack getFluidInTank(int tank);
 
     /**
@@ -73,7 +72,7 @@ public interface IFluidHandler
      * @return TRUE if the tank can hold the FluidStack, not considering current state.
      * (Basically, is a given fluid EVER allowed in this tank?) Return FALSE if the answer to that question is 'no.'
      */
-    boolean isFluidValid(int tank, @NotNull FluidStack stack);
+    boolean isFluidValid(int tank, @Nonnull FluidStack stack);
 
     /**
      * Fills fluid into internal tanks, distribution is left entirely to the IFluidHandler.
@@ -92,7 +91,7 @@ public interface IFluidHandler
      * @return FluidStack representing the Fluid and amount that was (or would have been, if
      * simulated) drained.
      */
-    @NotNull
+    @Nonnull
     FluidStack drain(FluidStack resource, FluidAction action);
 
     /**
@@ -105,7 +104,7 @@ public interface IFluidHandler
      * @return FluidStack representing the Fluid and amount that was (or would have been, if
      * simulated) drained.
      */
-    @NotNull
+    @Nonnull
     FluidStack drain(int maxDrain, FluidAction action);
 
 }

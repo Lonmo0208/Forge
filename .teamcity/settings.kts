@@ -1,7 +1,5 @@
 import jetbrains.buildServer.configs.kotlin.v2019_2.*
 import jetbrains.buildServer.configs.kotlin.v2019_2.projectFeatures.githubIssues
-import jetbrains.buildServer.configs.kotlin.*
-import jetbrains.buildServer.configs.kotlin.v2019_2.buildSteps.gradle
 
 /*
 The settings script is an entry point for defining a TeamCity
@@ -32,13 +30,11 @@ project {
     buildType(Build)
     buildType(BuildSecondaryBranches)
     buildType(PullRequests)
-    buildType(PullRequestChecks)
-    buildType(PullRequestCompatibility)
 
     params {
-        text("docker_jdk_version", "21", label = "Gradle version", description = "The version of the JDK to use during execution of tasks in a JDK.", display = ParameterDisplay.HIDDEN, allowEmpty = false)
-        text("docker_gradle_version", "8.7", label = "Gradle version", description = "The version of Gradle to use during execution of Gradle tasks.", display = ParameterDisplay.HIDDEN, allowEmpty = false)
-        text("git_main_branch", "1.21.x", label = "Git Main Branch", description = "The git main or default branch to use in VCS operations.", display = ParameterDisplay.HIDDEN, allowEmpty = false)
+        text("docker_jdk_version", "17", label = "Gradle version", description = "The version of the JDK to use during execution of tasks in a JDK.", display = ParameterDisplay.HIDDEN, allowEmpty = false)
+        text("docker_gradle_version", "7.4", label = "Gradle version", description = "The version of Gradle to use during execution of Gradle tasks.", display = ParameterDisplay.HIDDEN, allowEmpty = false)
+        text("git_main_branch", "1.18.x", label = "Git Main Branch", description = "The git main or default branch to use in VCS operations.", display = ParameterDisplay.HIDDEN, allowEmpty = false)
         text("git_branch_spec", """
                 +:refs/heads/(main*)
                 +:refs/heads/(master*)
@@ -47,6 +43,8 @@ project {
             """.trimIndent(), label = "The branch specification of the repository", description = "By default all main branches are build by the configuration. Modify this value to adapt the branches build.", display = ParameterDisplay.HIDDEN, allowEmpty = true)
         text("github_repository_name", "MinecraftForge", label = "The github repository name. Used to connect to it in VCS Roots.", description = "This is the repository slug on github. So for example `MinecraftForge` or `MinecraftForge`. It is interpolated into the global VCS Roots.", display = ParameterDisplay.HIDDEN, allowEmpty = false)
         text("env.PUBLISHED_JAVA_ARTIFACT_ID", "forge", label = "Published artifact id", description = "The maven coordinate artifact id that has been published by this build. Can not be empty.", allowEmpty = false)
+        text("env.PUBLISHED_JAVA_FML_ARTIFACT_ID", "fmlonly", label = "Published fmlonly artifact id", description = "The maven coordinate artifact id for fml only that has been published by this build. Can not be empty.", allowEmpty = false)
+        text("env.PUBLISHED_JAVA_FML_ARTIFACT_VERSION", "0.0.0-SNAPSHOT", label = "Published fmlonly artifact version", description = "The version for fml only that has been published by this build. Can not be empty.", allowEmpty = false)
         text("env.PUBLISHED_JAVA_GROUP", "net.minecraftforge", label = "Published group", description = "The maven coordinate group that has been published by this build. Can not be empty.", allowEmpty = false)
         //These are references and not actually keys
         password("env.CROWDIN_KEY", "credentialsJSON:a3102dbe-805d-4177-9f54-3d2c2eb08fd5", display = ParameterDisplay.HIDDEN)
@@ -74,6 +72,19 @@ object Build : BuildType({
     id("MinecraftForge_MinecraftForge__Build")
     name = "Build"
     description = "Builds and Publishes the main branches of the project."
+
+    features {
+        feature {
+            id = "trigger_fml_only_files_generator"
+            type = "triggerBuildFeature"
+            param("triggers", "MinecraftForge_FilesGenerator_GeneratePages")
+            param("parameters", """
+                env.PUBLISHED_JAVA_FML_ARTIFACT_ID~env.PUBLISHED_JAVA_ARTIFACT_ID
+                env.PUBLISHED_JAVA_FML_ARTIFACT_VERSION~env.PUBLISHED_JAVA_ARTIFACT_VERSION
+                env.PUBLISHED_JAVA_GROUP
+            """.trimIndent())
+        }
+    }
 })
 
 object BuildSecondaryBranches : BuildType({
@@ -113,74 +124,6 @@ object PullRequests : BuildType({
             display = ParameterDisplay.HIDDEN,
             allowEmpty = false
         )
-    }
-
-    vcs {
-        branchFilter = """
-            +:*
-            -:1.*
-            -:<default>
-        """.trimIndent()
-    }
-})
-
-object PullRequestChecks : BuildType({
-    templates(AbsoluteId("MinecraftForge_BuildPullRequests"), AbsoluteId("MinecraftForge_SetupGradleUtilsCiEnvironmen"), AbsoluteId("MinecraftForge_BuildWithDiscordNotifications"), AbsoluteId("MinecraftForge_SetupProjectUsingGradle"))
-    id("MinecraftForge_MinecraftForge__PullRequestChecks")
-    name = "Pull Requests (Checks)"
-    description = "Checks pull requests for the project"
-
-    steps {
-        gradle {
-            name = "Check"
-            id = "RUNNER_10_Check"
-
-            tasks = "checkAll"
-            gradleParams = "--continue %gradle_custom_args%"
-            enableStacktrace = true
-            dockerImage = "%docker_gradle_image%"
-            dockerRunParameters = """
-                -v "/opt/cache/agent/gradle:/home/gradle/.gradle"
-                -v "/opt/cache/shared/gradle:/home/gradle/rocache:ro"
-                --network=host
-                -u 1000:1000
-                %docker_additional_args%
-            """.trimIndent()
-        }
-    }
-
-    vcs {
-        branchFilter = """
-            +:*
-            -:1.*
-            -:<default>
-        """.trimIndent()
-    }
-})
-
-object PullRequestCompatibility : BuildType({
-    templates(AbsoluteId("MinecraftForge_BuildPullRequests"), AbsoluteId("MinecraftForge_SetupGradleUtilsCiEnvironmen"), AbsoluteId("MinecraftForge_BuildWithDiscordNotifications"), AbsoluteId("MinecraftForge_SetupProjectUsingGradle"))
-    id("MinecraftForge_MinecraftForge__PullRequestCompatibility")
-    name = "Pull Requests (Compatibility)"
-    description = "Validates binary compatibility for pull requests made to the project"
-
-    steps {
-        gradle {
-            name = "Validate"
-            id = "RUNNER_10_Compatibility"
-
-            tasks = "checkJarCompatibility"
-            gradleParams = "--continue %gradle_custom_args%"
-            enableStacktrace = true
-            dockerImage = "%docker_gradle_image%"
-            dockerRunParameters = """
-                -v "/opt/cache/agent/gradle:/home/gradle/.gradle"
-                -v "/opt/cache/shared/gradle:/home/gradle/rocache:ro"
-                --network=host
-                -u 1000:1000
-                %docker_additional_args%
-            """.trimIndent()
-        }
     }
 
     vcs {

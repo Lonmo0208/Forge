@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Forge Development LLC and contributors
+ * Minecraft Forge - Forge Development LLC
  * SPDX-License-Identifier: LGPL-2.1-only
  */
 
@@ -10,8 +10,8 @@ import net.minecraft.world.level.block.SoundType;
 import net.minecraft.sounds.SoundEvent;
 import net.minecraftforge.registries.RegistryObject;
 import net.minecraftforge.registries.DeferredRegister;
-import org.jetbrains.annotations.NotNull;
 
+import javax.annotation.Nonnull;
 import java.util.function.Supplier;
 
 /**
@@ -33,16 +33,17 @@ import java.util.function.Supplier;
  *
  * @see SoundType
  */
-public class ForgeSoundType extends SoundType {
+public class ForgeSoundType extends SoundType
+{
     private final Supplier<SoundEvent> breakSound;
     private final Supplier<SoundEvent> stepSound;
     private final Supplier<SoundEvent> placeSound;
     private final Supplier<SoundEvent> hitSound;
     private final Supplier<SoundEvent> fallSound;
 
-    @SuppressWarnings("deprecation")
-    public ForgeSoundType(float volumeIn, float pitchIn, Supplier<SoundEvent> breakSoundIn, Supplier<SoundEvent> stepSoundIn, Supplier<SoundEvent> placeSoundIn, Supplier<SoundEvent> hitSoundIn, Supplier<SoundEvent> fallSoundIn) {
-        super(volumeIn, pitchIn, null, null, null, null, null);
+    public ForgeSoundType(float volumeIn, float pitchIn, Supplier<SoundEvent> breakSoundIn, Supplier<SoundEvent> stepSoundIn, Supplier<SoundEvent> placeSoundIn, Supplier<SoundEvent> hitSoundIn, Supplier<SoundEvent> fallSoundIn)
+    {
+        super(volumeIn, pitchIn, (SoundEvent) null, (SoundEvent) null, (SoundEvent) null, (SoundEvent) null, (SoundEvent) null);
         this.breakSound = breakSoundIn;
         this.stepSound = stepSoundIn;
         this.placeSound = placeSoundIn;
@@ -50,33 +51,38 @@ public class ForgeSoundType extends SoundType {
         this.fallSound = fallSoundIn;
     }
 
-    @NotNull
+    @Nonnull
     @Override
-    public SoundEvent getBreakSound() {
+    public SoundEvent getBreakSound()
+    {
         return breakSound.get();
     }
 
-    @NotNull
+    @Nonnull
     @Override
-    public SoundEvent getStepSound() {
+    public SoundEvent getStepSound()
+    {
         return stepSound.get();
     }
 
-    @NotNull
+    @Nonnull
     @Override
-    public SoundEvent getPlaceSound() {
+    public SoundEvent getPlaceSound()
+    {
         return placeSound.get();
     }
 
-    @NotNull
+    @Nonnull
     @Override
-    public SoundEvent getHitSound() {
+    public SoundEvent getHitSound()
+    {
         return hitSound.get();
     }
 
-    @NotNull
+    @Nonnull
     @Override
-    public SoundEvent getFallSound() {
+    public SoundEvent getFallSound()
+    {
         return fallSound.get();
     }
 }

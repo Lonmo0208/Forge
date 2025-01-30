@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Forge Development LLC and contributors
+ * Minecraft Forge - Forge Development LLC
  * SPDX-License-Identifier: LGPL-2.1-only
  */
 
@@ -8,29 +8,18 @@ package net.minecraftforge.items.wrapper;
 import net.minecraft.world.WorldlyContainer;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.core.Direction;
-import net.minecraft.world.item.Items;
-import net.minecraft.world.level.block.entity.AbstractFurnaceBlockEntity;
-import net.minecraft.world.level.block.entity.BrewingStandBlockEntity;
 import net.minecraftforge.common.util.LazyOptional;
 import net.minecraftforge.items.IItemHandlerModifiable;
 import net.minecraftforge.items.ItemHandlerHelper;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 
-import java.util.function.IntUnaryOperator;
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 
 public class SidedInvWrapper implements IItemHandlerModifiable
 {
     protected final WorldlyContainer inv;
     @Nullable
     protected final Direction side;
-
-    private final IntUnaryOperator slotLimit;
-    private final InsertLimit newStackInsertLimit;
-    private interface InsertLimit
-    {
-        int limitInsert(int wrapperSlot, int invSlot, ItemStack stack);
-    }
 
     @SuppressWarnings("unchecked")
     public static LazyOptional<IItemHandlerModifiable>[] create(WorldlyContainer inv, Direction... sides) {
@@ -46,20 +35,6 @@ public class SidedInvWrapper implements IItemHandlerModifiable
     {
         this.inv = inv;
         this.side = side;
-
-        // A few special cases to account for canPlaceItem implementations attempting to limit specific inputs to 1,
-        // by returning false if there's already a contained item. This doesn't work with modded inserted sizes > 1.
-        // - Limit buckets to 1 in furnace fuel inputs.
-        // - Limit brewing stand "bottle" inputs to 1.
-        // Done using lambdas to avoid the overhead of instanceof checks in hot code.
-        if (inv instanceof BrewingStandBlockEntity)
-            this.slotLimit = wrapperSlot -> getSlot(inv, wrapperSlot, side) < 3 ? 1 : inv.getMaxStackSize();
-        else
-            this.slotLimit = wrapperSlot -> inv.getMaxStackSize();
-        if (inv instanceof AbstractFurnaceBlockEntity)
-            this.newStackInsertLimit = (wrapperSlot, invSlot, stack) -> invSlot == 1 && stack.is(Items.BUCKET) ? 1 : Math.min(stack.getMaxStackSize(), getSlotLimit(wrapperSlot));
-        else
-            this.newStackInsertLimit = (wrapperSlot, invSlot, stack) -> Math.min(stack.getMaxStackSize(), getSlotLimit(wrapperSlot));
     }
 
     public static int getSlot(WorldlyContainer inv, int slot, @Nullable Direction side)
@@ -98,7 +73,7 @@ public class SidedInvWrapper implements IItemHandlerModifiable
     }
 
     @Override
-    @NotNull
+    @Nonnull
     public ItemStack getStackInSlot(int slot)
     {
         int i = getSlot(inv, slot, side);
@@ -106,8 +81,8 @@ public class SidedInvWrapper implements IItemHandlerModifiable
     }
 
     @Override
-    @NotNull
-    public ItemStack insertItem(int slot, @NotNull ItemStack stack, boolean simulate)
+    @Nonnull
+    public ItemStack insertItem(int slot, @Nonnull ItemStack stack, boolean simulate)
     {
         if (stack.isEmpty())
             return ItemStack.EMPTY;
@@ -167,8 +142,7 @@ public class SidedInvWrapper implements IItemHandlerModifiable
             if (!inv.canPlaceItemThroughFace(slot1, stack, side) || !inv.canPlaceItem(slot1, stack))
                 return stack;
 
-            m = newStackInsertLimit.limitInsert(slot, slot1, stack);
-
+            m = Math.min(stack.getMaxStackSize(), getSlotLimit(slot));
             if (m < stack.getCount())
             {
                 // copy the stack to not modify the original one
@@ -195,7 +169,7 @@ public class SidedInvWrapper implements IItemHandlerModifiable
     }
 
     @Override
-    public void setStackInSlot(int slot, @NotNull ItemStack stack)
+    public void setStackInSlot(int slot, @Nonnull ItemStack stack)
     {
         int slot1 = getSlot(inv, slot, side);
 
@@ -209,7 +183,7 @@ public class SidedInvWrapper implements IItemHandlerModifiable
     }
 
     @Override
-    @NotNull
+    @Nonnull
     public ItemStack extractItem(int slot, int amount, boolean simulate)
     {
         if (amount == 0)
@@ -253,11 +227,11 @@ public class SidedInvWrapper implements IItemHandlerModifiable
     @Override
     public int getSlotLimit(int slot)
     {
-        return slotLimit.applyAsInt(slot);
+        return inv.getMaxStackSize();
     }
 
     @Override
-    public boolean isItemValid(int slot, @NotNull ItemStack stack)
+    public boolean isItemValid(int slot, @Nonnull ItemStack stack)
     {
         int slot1 = getSlot(inv, slot, side);
         return slot1 == -1 ? false : inv.canPlaceItem(slot1, stack);

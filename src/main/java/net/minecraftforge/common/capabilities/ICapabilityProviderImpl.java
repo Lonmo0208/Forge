@@ -1,14 +1,16 @@
 /*
- * Copyright (c) Forge Development LLC and contributors
+ * Minecraft Forge - Forge Development LLC
  * SPDX-License-Identifier: LGPL-2.1-only
  */
 
 package net.minecraftforge.common.capabilities;
 
-import org.jetbrains.annotations.ApiStatus;
+import javax.annotation.Nullable;
 
-@ApiStatus.Internal // Modders should use ICapabilityProvider, this is for Forge
-public interface ICapabilityProviderImpl<B extends ICapabilityProviderImpl<B>> extends ICapabilityProvider {
+public interface ICapabilityProviderImpl<B extends ICapabilityProviderImpl<B>> extends ICapabilityProvider
+{
+    boolean areCapsCompatible(CapabilityProvider<B> other);
+    boolean areCapsCompatible(@Nullable CapabilityDispatcher other);
     void invalidateCaps();
     void reviveCaps();
 }

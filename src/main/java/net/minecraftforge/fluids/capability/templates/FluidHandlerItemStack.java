@@ -1,23 +1,24 @@
 /*
- * Copyright (c) Forge Development LLC and contributors
+ * Minecraft Forge - Forge Development LLC
  * SPDX-License-Identifier: LGPL-2.1-only
  */
 
-/** Forge: TODO: Forge ItemStack capabilities - Lex 042724
 package net.minecraftforge.fluids.capability.templates;
+
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.core.Direction;
 import net.minecraftforge.common.capabilities.Capability;
-import net.minecraftforge.common.capabilities.ForgeCapabilities;
 import net.minecraftforge.common.capabilities.ICapabilityProvider;
 import net.minecraftforge.common.util.LazyOptional;
 import net.minecraftforge.fluids.*;
+import net.minecraftforge.fluids.capability.CapabilityFluidHandler;
 import net.minecraftforge.fluids.capability.IFluidHandlerItem;
 
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
+import net.minecraftforge.fluids.capability.IFluidHandler.FluidAction;
 
 /**
  * FluidHandlerItemStack is a template capability provider for ItemStacks.
@@ -27,35 +28,35 @@ import org.jetbrains.annotations.Nullable;
  *
  * Additional examples are provided to enable consumable fluid containers (see {@link Consumable}),
  * fluid containers with different empty and full items (see {@link SwapEmpty},
- * /
+ */
 public class FluidHandlerItemStack implements IFluidHandlerItem, ICapabilityProvider
 {
     public static final String FLUID_NBT_KEY = "Fluid";
 
     private final LazyOptional<IFluidHandlerItem> holder = LazyOptional.of(() -> this);
 
-    @NotNull
+    @Nonnull
     protected ItemStack container;
     protected int capacity;
 
     /**
      * @param container  The container itemStack, data is stored on it directly as NBT.
      * @param capacity   The maximum capacity of this fluid tank.
-     * /
-    public FluidHandlerItemStack(@NotNull ItemStack container, int capacity)
+     */
+    public FluidHandlerItemStack(@Nonnull ItemStack container, int capacity)
     {
         this.container = container;
         this.capacity = capacity;
     }
 
-    @NotNull
+    @Nonnull
     @Override
     public ItemStack getContainer()
     {
         return container;
     }
 
-    @NotNull
+    @Nonnull
     public FluidStack getFluid()
     {
         CompoundTag tagCompound = container.getTag();
@@ -84,7 +85,7 @@ public class FluidHandlerItemStack implements IFluidHandlerItem, ICapabilityProv
         return 1;
     }
 
-    @NotNull
+    @Nonnull
     @Override
     public FluidStack getFluidInTank(int tank) {
 
@@ -98,7 +99,7 @@ public class FluidHandlerItemStack implements IFluidHandlerItem, ICapabilityProv
     }
 
     @Override
-    public boolean isFluidValid(int tank, @NotNull FluidStack stack) {
+    public boolean isFluidValid(int tank, @Nonnull FluidStack stack) {
 
         return true;
     }
@@ -143,7 +144,7 @@ public class FluidHandlerItemStack implements IFluidHandlerItem, ICapabilityProv
         }
     }
 
-    @NotNull
+    @Nonnull
     @Override
     public FluidStack drain(FluidStack resource, FluidAction action)
     {
@@ -154,7 +155,7 @@ public class FluidHandlerItemStack implements IFluidHandlerItem, ICapabilityProv
         return drain(resource.getAmount(), action);
     }
 
-    @NotNull
+    @Nonnull
     @Override
     public FluidStack drain(int maxDrain, FluidAction action)
     {
@@ -203,22 +204,22 @@ public class FluidHandlerItemStack implements IFluidHandlerItem, ICapabilityProv
     /**
      * Override this method for special handling.
      * Can be used to swap out or destroy the container.
-     * /
+     */
     protected void setContainerToEmpty()
     {
         container.removeTagKey(FLUID_NBT_KEY);
     }
 
     @Override
-    @NotNull
-    public <T> LazyOptional<T> getCapability(@NotNull Capability<T> capability, @Nullable Direction facing)
+    @Nonnull
+    public <T> LazyOptional<T> getCapability(@Nonnull Capability<T> capability, @Nullable Direction facing)
     {
-        return ForgeCapabilities.FLUID_HANDLER_ITEM.orEmpty(capability, holder);
+        return CapabilityFluidHandler.FLUID_HANDLER_ITEM_CAPABILITY.orEmpty(capability, holder);
     }
 
     /**
      * Destroys the container item when it's emptied.
-     * /
+     */
     public static class Consumable extends FluidHandlerItemStack
     {
         public Consumable(ItemStack container, int capacity)
@@ -236,7 +237,7 @@ public class FluidHandlerItemStack implements IFluidHandlerItem, ICapabilityProv
 
     /**
      * Swaps the container item for a different one when it's emptied.
-     * /
+     */
     public static class SwapEmpty extends FluidHandlerItemStack
     {
         protected final ItemStack emptyContainer;
@@ -255,4 +256,3 @@ public class FluidHandlerItemStack implements IFluidHandlerItem, ICapabilityProv
         }
     }
 }
-*/

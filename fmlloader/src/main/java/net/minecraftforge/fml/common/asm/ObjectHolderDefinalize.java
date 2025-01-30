@@ -1,18 +1,27 @@
 /*
- * Copyright (c) Forge Development LLC and contributors
- * SPDX-License-Identifier: LGPL-2.1-only
+ * Minecraft Forge
+ * Copyright (c) 2016-2021.
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation version 2.1
+ * of the License.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
 package net.minecraftforge.fml.common.asm;
 
 import java.util.EnumSet;
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.function.Function;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
@@ -25,59 +34,29 @@ import cpw.mods.modlauncher.serviceapi.ILaunchPluginService;
  * Will also de-finalize all fields in on class level annotations.
  */
 public class ObjectHolderDefinalize implements ILaunchPluginService {
-    // Hardcoded map of vanilla classes that should have object holders for each field of the given registry type.
-    // IMPORTANT: Updates to this collection must be reflected in ObjectHolderRegistry. Duplicated cuz classloaders, yay!
-    // Classnames are validated in ObjectHolderRegistry.
-    private static final Map<String, VanillaObjectHolderData> VANILLA_OBJECT_HOLDERS = Stream.of(
-            new VanillaObjectHolderData("net.minecraft.world.level.block.Blocks", "block", "net.minecraft.world.level.block.Block"),
-            new VanillaObjectHolderData("net.minecraft.world.item.Items", "item", "net.minecraft.world.item.Item"),
-            new VanillaObjectHolderData("net.minecraft.world.item.enchantment.Enchantments", "enchantment", "net.minecraft.world.item.enchantment.Enchantment"),
-            new VanillaObjectHolderData("net.minecraft.world.effect.MobEffects", "mob_effect", "net.minecraft.world.effect.MobEffect"),
-            new VanillaObjectHolderData("net.minecraft.core.particles.ParticleTypes", "particle_type", "net.minecraft.core.particles.ParticleType"),
-            new VanillaObjectHolderData("net.minecraft.sounds.SoundEvents", "sound_event", "net.minecraft.sounds.SoundEvent")
-    ).collect(Collectors.toUnmodifiableMap(VanillaObjectHolderData::holderClass, Function.identity()));
-    private static final Set<String> VANILLA_OBJECT_HOLDER_CLASSES = VANILLA_OBJECT_HOLDERS.keySet().stream()
-            .map(it -> it.replace('.', '/'))
-            .collect(Collectors.toUnmodifiableSet());
-    private static final String OBJECT_HOLDER = "Lnet/minecraftforge/registries/ObjectHolder;"; //Don't directly reference this to prevent class loading.
-    private static final int PUBLIC_STATIC_FINAL_FLAGS = Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC | Opcodes.ACC_FINAL;
+
+    private final String OBJECT_HOLDER = "Lnet/minecraftforge/registries/ObjectHolder;"; //Don't directly reference this to prevent class loading.
 
     @Override
     public String name() {
         return "object_holder_definalize";
     }
 
+
     private static final EnumSet<Phase> YAY = EnumSet.of(Phase.AFTER);
     private static final EnumSet<Phase> NAY = EnumSet.noneOf(Phase.class);
 
     @Override
-    public EnumSet<Phase> handlesClass(Type classType, boolean isEmpty) {
-        if (isEmpty)
-            return NAY;
-
-        // Let's skip processing classes that definitely don't have object holders
-        String internalName = classType.getInternalName();
-
-        // Forge classes that aren't in the debug package (that package is used for tests)
-        if (internalName.startsWith("net/minecraftforge/") && !internalName.substring(18).contains("debug"))
-            return NAY;
-
-        // Vanilla classes that don't have object holders
-        if (internalName.startsWith("com/mojang/"))
-            return NAY;
-
-        // ...except specific ones we added to the VANILLA_OBJECT_HOLDERS map
-        if (internalName.startsWith("net/minecraft/") && !VANILLA_OBJECT_HOLDER_CLASSES.contains(internalName))
-            return NAY;
-
-        return YAY;
+    public EnumSet<Phase> handlesClass(Type classType, boolean isEmpty)
+    {
+        return isEmpty ? NAY : YAY;
     }
 
-    private static boolean hasHolder(List<AnnotationNode> lst) {
+    private boolean hasHolder(List<AnnotationNode> lst)
+    {
         return lst != null && lst.stream().anyMatch(n -> n.desc.equals(OBJECT_HOLDER));
     }
 
-    @SuppressWarnings("unused")
     private String getValue(List<AnnotationNode> lst)
     {
         AnnotationNode ann = lst.stream().filter(n -> n.desc.equals(OBJECT_HOLDER)).findFirst().get();
@@ -97,9 +76,10 @@ public class ObjectHolderDefinalize implements ILaunchPluginService {
     {
         final AtomicBoolean changes = new AtomicBoolean();
         //Must be public static finals, and non-array objects
+        final int flags = Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC | Opcodes.ACC_FINAL;
 
         //Fix Annotated Fields before injecting from class level
-        classNode.fields.stream().filter(f -> ((f.access & PUBLIC_STATIC_FINAL_FLAGS) == PUBLIC_STATIC_FINAL_FLAGS) && f.desc.startsWith("L") && hasHolder(f.visibleAnnotations)).forEach(f ->
+        classNode.fields.stream().filter(f -> ((f.access & flags) == flags) && f.desc.startsWith("L") && hasHolder(f.visibleAnnotations)).forEach(f ->
         {
             int prev = f.access;
             f.access &= ~Opcodes.ACC_FINAL; //Strip final
@@ -107,9 +87,11 @@ public class ObjectHolderDefinalize implements ILaunchPluginService {
             changes.compareAndSet(false, prev != f.access);
         });
 
-        if (VANILLA_OBJECT_HOLDERS.containsKey(classType.getClassName())) //Class level, de-finalize all fields and add @ObjectHolder to them!
+        if (hasHolder(classNode.visibleAnnotations)) //Class level, de-finalize all fields and add @ObjectHolder to them!
         {
-            classNode.fields.stream().filter(f -> ((f.access & PUBLIC_STATIC_FINAL_FLAGS) == PUBLIC_STATIC_FINAL_FLAGS) && f.desc.startsWith("L")).forEach(f ->
+            @SuppressWarnings("unused")
+            String value = getValue(classNode.visibleAnnotations);
+            classNode.fields.stream().filter(f -> ((f.access & flags) == flags) && f.desc.startsWith("L")).forEach(f ->
             {
                 int prev = f.access;
                 f.access &= ~Opcodes.ACC_FINAL;
@@ -127,5 +109,4 @@ public class ObjectHolderDefinalize implements ILaunchPluginService {
         return changes.get() ? ComputeFlags.SIMPLE_REWRITE : ComputeFlags.NO_REWRITE;
     }
 
-    private record VanillaObjectHolderData(String holderClass, String registryName, String registryType) {}
 }

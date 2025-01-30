@@ -1,6 +1,20 @@
 /*
- * Copyright (c) Forge Development LLC and contributors
- * SPDX-License-Identifier: LGPL-2.1-only
+ * Minecraft Forge
+ * Copyright (c) 2016-2021.
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation version 2.1
+ * of the License.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
 package net.minecraftforge.fml.loading.moddiscovery;
@@ -12,12 +26,10 @@ import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.Optional;
 import java.util.function.BiPredicate;
-import java.util.stream.Stream;
 import java.util.zip.ZipFile;
 
 import static cpw.mods.modlauncher.api.LamdbaExceptionUtils.*;
 
-// TODO: [FML][Loader] By the time this is reached, most stuff this checks for is already filtered out - needs fixing.
 public enum InvalidModIdentifier {
 
     OLDFORGE(filePresent("mcmod.info")),
@@ -25,9 +37,9 @@ public enum InvalidModIdentifier {
     LITELOADER(filePresent("litemod.json")),
     OPTIFINE(filePresent("optifine/Installer.class")),
     BUKKIT(filePresent("plugin.yml")),
-    INVALIDZIP((f,zf) -> zf.isEmpty()); // note: only this one INVALIDZIP check is ran until the todo on this class is fixed
+    INVALIDZIP((f,zf) -> !zf.isPresent());
 
-    private final BiPredicate<Path, Optional<ZipFile>> ident;
+    private BiPredicate<Path, Optional<ZipFile>> ident;
 
     InvalidModIdentifier(BiPredicate<Path, Optional<ZipFile>> identifier)
     {
@@ -42,7 +54,7 @@ public enum InvalidModIdentifier {
     public static Optional<String> identifyJarProblem(Path path)
     {
         Optional<ZipFile> zfo = optionalFromException(() -> new ZipFile(path.toFile()));
-        Optional<String> result = Stream.of(INVALIDZIP).
+        Optional<String> result = Arrays.stream(values()).
                                          filter(i -> i.ident.test(path, zfo)).
                                          map(InvalidModIdentifier::getReason).
                                          findAny();

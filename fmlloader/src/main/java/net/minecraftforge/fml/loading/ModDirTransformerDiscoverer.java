@@ -1,48 +1,38 @@
 /*
- * Copyright (c) Forge Development LLC and contributors
- * SPDX-License-Identifier: LGPL-2.1-only
+ * Minecraft Forge
+ * Copyright (c) 2016-2021.
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation version 2.1
+ * of the License.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
 package net.minecraftforge.fml.loading;
 
-import com.mojang.logging.LogUtils;
-import cpw.mods.jarhandling.SecureJar;
 import cpw.mods.modlauncher.api.LamdbaExceptionUtils;
 import cpw.mods.modlauncher.api.NamedPath;
 import cpw.mods.modlauncher.serviceapi.ITransformerDiscoveryService;
+import org.apache.logging.log4j.LogManager;
 
-import org.jetbrains.annotations.ApiStatus;
-import org.slf4j.Logger;
-
+import java.io.File;
 import java.io.IOException;
-import java.lang.module.ModuleDescriptor;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Set;
+import java.util.zip.ZipFile;
 
-@ApiStatus.Internal
 public class ModDirTransformerDiscoverer implements ITransformerDiscoveryService {
-    private static final Logger LOGGER = LogUtils.getLogger();
-    private static final Set<String> SERVICES = Set.of(
-        "cpw.mods.modlauncher.api.ITransformationService",
-        "net.minecraftforge.forgespi.locating.IModLocator",
-        "net.minecraftforge.forgespi.locating.IDependencyLocator"
-    );
-
-    @Override
-    public List<NamedPath> candidates(final Path gameDirectory, final String launchTarget) {
-        FMLPaths.loadAbsolutePaths(gameDirectory);
-        FMLConfig.load();
-        return candidates(gameDirectory);
-    }
-
-    @Override
-    public void earlyInitialization(final String launchTarget, final String[] arguments) {
-        ImmediateWindowHandler.load(launchTarget, arguments);
-    }
-
     @Override
     public List<NamedPath> candidates(final Path gameDirectory) {
         ModDirTransformerDiscoverer.scan(gameDirectory);
@@ -64,7 +54,7 @@ public class ModDirTransformerDiscoverer implements ITransformerDiscoveryService
         try (var walk = Files.walk(modsDir, 1)){
             walk.forEach(ModDirTransformerDiscoverer::visitFile);
         } catch (IOException | IllegalStateException ioe) {
-            LOGGER.error("Error during early discovery", ioe);
+            LogManager.getLogger().error("Error during early discovery", ioe);
         }
     }
 
@@ -72,22 +62,14 @@ public class ModDirTransformerDiscoverer implements ITransformerDiscoveryService
         if (!Files.isRegularFile(path)) return;
         if (!path.toString().endsWith(".jar")) return;
         if (LamdbaExceptionUtils.uncheck(() -> Files.size(path)) == 0) return;
-
-        SecureJar jar = SecureJar.from(path);
-        jar.moduleDataProvider().descriptor().provides().stream()
-            .map(ModuleDescriptor.Provides::service)
-            .filter(SERVICES::contains)
-            .forEach(s -> found.add(new NamedPath(s, path)));
-    }
-
-    public static boolean isServiceProvider(Path path) {
-        var jar = SecureJar.from(path);
-
-        for (var providers : jar.moduleDataProvider().descriptor().provides()) {
-            if (SERVICES.contains(providers.service()))
-                return true;
+        try (ZipFile zf = new ZipFile(new File(path.toUri()))) {
+            if (zf.getEntry("META-INF/services/cpw.mods.modlauncher.api.ITransformationService") != null) {
+                found.add(new NamedPath(zf.getName(), path));
+            } else if (zf.getEntry("META-INF/services/net.minecraftforge.forgespi.locating.IModLocator") != null) {
+                found.add(new NamedPath(zf.getName(), path));
+            }
+        } catch (IOException ioe) {
+            LogManager.getLogger().error("Zip Error when loading jar file {}", path, ioe);
         }
-
-        return false;
     }
 }

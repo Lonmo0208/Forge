@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Forge Development LLC and contributors
+ * Minecraft Forge - Forge Development LLC
  * SPDX-License-Identifier: LGPL-2.1-only
  */
 
@@ -16,13 +16,13 @@ public class PlayerWakeUpEvent extends PlayerEvent
 {
     private final boolean wakeImmediately;
 
-    private final boolean updateLevel;
+    private final boolean updateWorld;
 
-    public PlayerWakeUpEvent(Player player, boolean wakeImmediately, boolean updateLevel)
+    public PlayerWakeUpEvent(Player player, boolean wakeImmediately, boolean updateWorld)
     {
         super(player);
         this.wakeImmediately = wakeImmediately;
-        this.updateLevel = updateLevel;
+        this.updateWorld = updateWorld;
     }
 
     /**
@@ -35,5 +35,5 @@ public class PlayerWakeUpEvent extends PlayerEvent
      * Indicates if the server should be notified of sleeping changes.
      * This will only be false if the server is considered 'up to date' already, because, for example, it initiated the call.
      */
-    public boolean updateLevel() { return updateLevel; }
+    public boolean updateWorld() { return updateWorld; }
 }

@@ -1,38 +1,32 @@
 /*
- * Copyright (c) Forge Development LLC and contributors
+ * Minecraft Forge - Forge Development LLC
  * SPDX-License-Identifier: LGPL-2.1-only
  */
 
 package net.minecraftforge.client.event;
 
-import net.minecraft.client.ClientRecipeBook;
 import net.minecraft.world.item.crafting.RecipeManager;
-import net.minecraftforge.common.MinecraftForge;
-import net.minecraftforge.eventbus.api.Cancelable;
+import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.eventbus.api.Event;
-import net.minecraftforge.fml.LogicalSide;
-import org.jetbrains.annotations.ApiStatus;
 
 /**
- * Fired when the {@link ClientRecipeBook} has updated information about recipes from the server to the client.
- *
- * <p>This event is not {@linkplain Cancelable cancellable}, and does not {@linkplain HasResult have a result}.</p>
- *
- * <p>This event is fired on the {@linkplain MinecraftForge#EVENT_BUS main Forge event bus},
- * only on the {@linkplain LogicalSide#CLIENT logical client}.</p>
+ * Fired on {@link Dist#CLIENT} when {@link RecipeManager} has all of its recipes synced from the server to the client (just after a client has connected),
  */
-public class RecipesUpdatedEvent extends Event {
-    private final ClientRecipeBook recipeBook;
-
-    @ApiStatus.Internal
-    public RecipesUpdatedEvent(ClientRecipeBook recipeBook) {
-        this.recipeBook = recipeBook;
+public class RecipesUpdatedEvent extends Event
+{
+    
+    private final RecipeManager mgr;
+    
+    public RecipesUpdatedEvent(RecipeManager mgr)
+    {
+        this.mgr = mgr;
     }
 
     /**
-     * {@return the recipe manager}
+     * @return The newly-updated recipe manager that now contains all the recipes that were just received.
      */
-    public ClientRecipeBook getRecipeBook() {
-        return recipeBook;
+    public RecipeManager getRecipeManager()
+    {
+        return mgr;
     }
 }

@@ -1,27 +1,38 @@
 /*
- * Copyright (c) Forge Development LLC and contributors
- * SPDX-License-Identifier: LGPL-2.1-only
+ * Minecraft Forge
+ * Copyright (c) 2016-2021.
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation version 2.1
+ * of the License.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
 package net.minecraftforge.fml.config;
 
 import com.electronwill.nightconfig.core.CommentedConfig;
 import com.electronwill.nightconfig.core.file.CommentedFileConfig;
-import com.mojang.logging.LogUtils;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.fml.DistExecutor;
-import net.minecraftforge.fml.loading.FMLPaths;
-import org.slf4j.Logger;
-import org.slf4j.Marker;
-import org.slf4j.MarkerFactory;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+import org.apache.logging.log4j.Marker;
+import org.apache.logging.log4j.MarkerManager;
 
 import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class ConfigTracker {
-    private static final Logger LOGGER = LogUtils.getLogger();
-    static final Marker CONFIG = MarkerFactory.getMarker("CONFIG");
+    private static final Logger LOGGER = LogManager.getLogger();
+    static final Marker CONFIG = MarkerManager.getMarker("CONFIG");
     public static final ConfigTracker INSTANCE = new ConfigTracker();
     private final ConcurrentHashMap<String, ModConfig> fileMap;
     private final EnumMap<ModConfig.Type, Set<ModConfig>> configSets;
@@ -50,32 +61,15 @@ public class ConfigTracker {
 
     public void loadConfigs(ModConfig.Type type, Path configBasePath) {
         LOGGER.debug(CONFIG, "Loading configs type {}", type);
-        for (ModConfig config : this.configSets.get(type)) {
-            openConfig(config, configBasePath);
-        }
+        this.configSets.get(type).forEach(config -> openConfig(config, configBasePath));
     }
 
-    // TODO: [FML] This is only called for the server (outside of forceUnload)
-    // rethink config implementation for eventual FML rewrite
     public void unloadConfigs(ModConfig.Type type, Path configBasePath) {
         LOGGER.debug(CONFIG, "Unloading configs type {}", type);
-        for (ModConfig config : this.configSets.get(type)) {
-            closeConfig(config, configBasePath);
-        }
-        ConfigFileTypeHandler.get(type).stopWatcher();
+        this.configSets.get(type).forEach(config -> closeConfig(config, configBasePath));
     }
 
-    // If there is a better way to do this, please tell me. Because this is FUCKED
-    public void forceUnload() {
-        // This is how ModStateProvider handles loading configs. So we're doing the same but with unloadConfigs instead
-        DistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> () -> this.unloadConfigs(ModConfig.Type.CLIENT, FMLPaths.CONFIGDIR.get()));
-        this.unloadConfigs(ModConfig.Type.COMMON, FMLPaths.CONFIGDIR.get());
-
-        // just in case server watcher is still alive somehow...
-        ConfigFileTypeHandler.get(ModConfig.Type.SERVER).stopWatcher();
-    }
-
-    private static void openConfig(final ModConfig config, final Path configBasePath) {
+    private void openConfig(final ModConfig config, final Path configBasePath) {
         LOGGER.trace(CONFIG, "Loading config file type {} at {} for {}", config.getType(), config.getFileName(), config.getModId());
         final CommentedFileConfig configData = config.getHandler().reader(configBasePath).apply(config);
         config.setConfigData(configData);
@@ -83,15 +77,11 @@ public class ConfigTracker {
         config.save();
     }
 
-    private static void closeConfig(final ModConfig config, final Path configBasePath) {
+    private void closeConfig(final ModConfig config, final Path configBasePath) {
         if (config.getConfigData() != null) {
             LOGGER.trace(CONFIG, "Closing config file type {} at {} for {}", config.getType(), config.getFileName(), config.getModId());
-            // stop the filewatcher before we save the file and close it, so reload doesn't fire
-            config.getHandler().unload(configBasePath, config);
-            var unloading = IConfigEvent.unloading(config);
-            if (unloading != null)
-                config.fireEvent(unloading);
             config.save();
+            config.getHandler().unload(configBasePath, config);
             config.setConfigData(null);
         }
     }

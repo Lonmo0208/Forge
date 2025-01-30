@@ -1,19 +1,33 @@
 /*
- * Copyright (c) Forge Development LLC and contributors
- * SPDX-License-Identifier: LGPL-2.1-only
+ * Minecraft Forge
+ * Copyright (c) 2016-2021.
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation version 2.1
+ * of the License.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
 package net.minecraftforge.fml.loading.moddiscovery;
 
-import com.mojang.logging.LogUtils;
-import net.minecraftforge.fml.loading.ImmediateWindowHandler;
 import net.minecraftforge.fml.loading.LoadingModList;
 import net.minecraftforge.fml.loading.LogMarkers;
 import net.minecraftforge.forgespi.language.ModFileScanData;
-import org.slf4j.Logger;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.*;
 
@@ -28,9 +42,11 @@ public class BackgroundScanHandler
         ERRORED
     }
 
-    private static final Logger LOGGER = LogUtils.getLogger();
-    private static final boolean DEBUG = LOGGER.isErrorEnabled(LogMarkers.SCAN);
+    private static final Logger LOGGER = LogManager.getLogger();
     private final ExecutorService modContentScanner;
+    private final List<ModFile> pendingFiles;
+    private final List<ModFile> scannedFiles;
+    private final List<ModFile> allFiles;
     private final List<ModFile> modFiles;
     private ScanStatus status;
     private LoadingModList loadingModList;
@@ -42,6 +58,9 @@ public class BackgroundScanHandler
             thread.setDaemon(true);
             return thread;
         });
+        scannedFiles = new ArrayList<>();
+        pendingFiles = new ArrayList<>();
+        allFiles = new ArrayList<>();
         status = ScanStatus.NOT_STARTED;
     }
 
@@ -55,18 +74,21 @@ public class BackgroundScanHandler
             throw new IllegalStateException("Scanner has shutdown");
         }
         status = ScanStatus.RUNNING;
-        ImmediateWindowHandler.updateProgress("Scanning mod candidates");
-        CompletableFuture<ModFileScanData> future = CompletableFuture.supplyAsync(file::compileContent, modContentScanner)
-                .whenComplete(file::setScanResult);
-        if (DEBUG) future = future.whenComplete((r, t) -> addCompletedFile(file, t));
+        allFiles.add(file);
+        pendingFiles.add(file);
+        final CompletableFuture<ModFileScanData> future = CompletableFuture.supplyAsync(file::compileContent, modContentScanner)
+                .whenComplete(file::setScanResult)
+                .whenComplete((r,t)-> this.addCompletedFile(file,r,t));
         file.setFutureScanResult(future);
     }
 
-    private void addCompletedFile(final ModFile file, final Throwable throwable) {
+    private void addCompletedFile(final ModFile file, final ModFileScanData modFileScanData, final Throwable throwable) {
         if (throwable != null) {
             status = ScanStatus.ERRORED;
-            LOGGER.error(LogMarkers.SCAN, "An error occurred scanning file {}", file, throwable);
+            LOGGER.error(LogMarkers.SCAN,"An error occurred scanning file {}", file, throwable);
         }
+        pendingFiles.remove(file);
+        scannedFiles.add(file);
     }
 
     public void setLoadingModList(LoadingModList loadingModList)

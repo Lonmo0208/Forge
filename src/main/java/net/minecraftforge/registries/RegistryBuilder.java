@@ -1,82 +1,80 @@
 /*
- * Copyright (c) Forge Development LLC and contributors
+ * Minecraft Forge - Forge Development LLC
  * SPDX-License-Identifier: LGPL-2.1-only
  */
 
 package net.minecraftforge.registries;
 
-import net.minecraft.core.Holder;
-import net.minecraft.resources.ResourceLocation;
-import net.minecraftforge.registries.IForgeRegistry.AddCallback;
-import net.minecraftforge.registries.IForgeRegistry.BakeCallback;
-import net.minecraftforge.registries.IForgeRegistry.ClearCallback;
-import net.minecraftforge.registries.IForgeRegistry.CreateCallback;
-import net.minecraftforge.registries.IForgeRegistry.MissingFactory;
-import net.minecraftforge.registries.IForgeRegistry.ValidateCallback;
-import org.jetbrains.annotations.Nullable;
-
-import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.function.Function;
 
-public class RegistryBuilder<T> {
-    public static <T> RegistryBuilder<T> of() {
-        return new RegistryBuilder<T>();
-    }
+import com.google.common.collect.Lists;
 
-    public static <T> RegistryBuilder<T> of(String name) {
-        return of(ResourceLocation.parse(name));
-    }
+import net.minecraft.core.Holder;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraftforge.registries.IForgeRegistry.*;
 
-    public static <T> RegistryBuilder<T> of(ResourceLocation name) {
-        return new RegistryBuilder<T>().setName(name);
-    }
+import javax.annotation.Nullable;
 
+public class RegistryBuilder<T extends IForgeRegistryEntry<T>>
+{
     private static final int MAX_ID = Integer.MAX_VALUE - 1;
 
     private ResourceLocation registryName;
+    private Class<T> registryType;
     private ResourceLocation optionalDefaultKey;
     private int minId = 0;
     private int maxId = MAX_ID;
-    private final List<AddCallback<T>> addCallback = new ArrayList<>();
-    private final List<ClearCallback<T>> clearCallback = new ArrayList<>();
-    private final List<CreateCallback<T>> createCallback = new ArrayList<>();
-    private final List<ValidateCallback<T>> validateCallback = new ArrayList<>();
-    private final List<BakeCallback<T>> bakeCallback = new ArrayList<>();
+    private List<AddCallback<T>> addCallback = Lists.newArrayList();
+    private List<ClearCallback<T>> clearCallback = Lists.newArrayList();
+    private List<CreateCallback<T>> createCallback = Lists.newArrayList();
+    private List<ValidateCallback<T>> validateCallback = Lists.newArrayList();
+    private List<BakeCallback<T>> bakeCallback = Lists.newArrayList();
+    private Function<T, Holder.Reference<T>> vanillaHolder;
     private boolean saveToDisc = true;
     private boolean sync = true;
     private boolean allowOverrides = true;
     private boolean allowModifications = false;
     private boolean hasWrapper = false;
+    private DummyFactory<T> dummyFactory;
     private MissingFactory<T> missingFactory;
-    private final Set<ResourceLocation> legacyNames = new HashSet<>();
-    @Nullable
-    private Function<T, Holder.Reference<T>> intrusiveHolderCallback = null;
+    private Set<ResourceLocation> legacyNames = new HashSet<>();
 
-    public RegistryBuilder<T> setName(ResourceLocation name) {
+    public RegistryBuilder<T> setName(ResourceLocation name)
+    {
         this.registryName = name;
         return this;
     }
 
-    public RegistryBuilder<T> setIDRange(int min, int max) {
+    public RegistryBuilder<T> setType(Class<T> type)
+    {
+        this.registryType = type;
+        return this;
+    }
+
+    public RegistryBuilder<T> setIDRange(int min, int max)
+    {
         this.minId = Math.max(min, 0);
         this.maxId = Math.min(max, MAX_ID);
         return this;
     }
 
-    public RegistryBuilder<T> setMaxID(int max) {
+    public RegistryBuilder<T> setMaxID(int max)
+    {
         return this.setIDRange(0, max);
     }
 
-    public RegistryBuilder<T> setDefaultKey(ResourceLocation key) {
+    public RegistryBuilder<T> setDefaultKey(ResourceLocation key)
+    {
         this.optionalDefaultKey = key;
         return this;
     }
 
     @SuppressWarnings("unchecked")
-    public RegistryBuilder<T> addCallback(Object inst) {
+    public RegistryBuilder<T> addCallback(Object inst)
+    {
         if (inst instanceof AddCallback)
             this.add((AddCallback<T>)inst);
         if (inst instanceof ClearCallback)
@@ -87,104 +85,134 @@ public class RegistryBuilder<T> {
             this.add((ValidateCallback<T>)inst);
         if (inst instanceof BakeCallback)
             this.add((BakeCallback<T>)inst);
+        if (inst instanceof DummyFactory)
+            this.set((DummyFactory<T>)inst);
         if (inst instanceof MissingFactory)
             this.set((MissingFactory<T>)inst);
         return this;
     }
 
-    public RegistryBuilder<T> add(AddCallback<T> add) {
+    public RegistryBuilder<T> add(AddCallback<T> add)
+    {
         this.addCallback.add(add);
         return this;
     }
 
-    public RegistryBuilder<T> onAdd(AddCallback<T> add) {
+    public RegistryBuilder<T> onAdd(AddCallback<T> add)
+    {
         return this.add(add);
     }
 
-    public RegistryBuilder<T> add(ClearCallback<T> clear) {
+    public RegistryBuilder<T> add(ClearCallback<T> clear)
+    {
         this.clearCallback.add(clear);
         return this;
     }
 
-    public RegistryBuilder<T> onClear(ClearCallback<T> clear) {
+    public RegistryBuilder<T> onClear(ClearCallback<T> clear)
+    {
         return this.add(clear);
     }
 
-    public RegistryBuilder<T> add(CreateCallback<T> create) {
+    public RegistryBuilder<T> add(CreateCallback<T> create)
+    {
         this.createCallback.add(create);
         return this;
     }
 
-    public RegistryBuilder<T> onCreate(CreateCallback<T> create) {
+    public RegistryBuilder<T> onCreate(CreateCallback<T> create)
+    {
         return this.add(create);
     }
 
-    public RegistryBuilder<T> add(ValidateCallback<T> validate) {
+    public RegistryBuilder<T> add(ValidateCallback<T> validate)
+    {
         this.validateCallback.add(validate);
         return this;
     }
 
-    public RegistryBuilder<T> onValidate(ValidateCallback<T> validate) {
+    public RegistryBuilder<T> onValidate(ValidateCallback<T> validate)
+    {
         return this.add(validate);
     }
 
-    public RegistryBuilder<T> add(BakeCallback<T> bake) {
+    public RegistryBuilder<T> add(BakeCallback<T> bake)
+    {
         this.bakeCallback.add(bake);
         return this;
     }
 
-    public RegistryBuilder<T> onBake(BakeCallback<T> bake) {
+    public RegistryBuilder<T> onBake(BakeCallback<T> bake)
+    {
         return this.add(bake);
     }
 
-    public RegistryBuilder<T> set(MissingFactory<T> missing) {
+    public RegistryBuilder<T> set(DummyFactory<T> factory)
+    {
+        this.dummyFactory = factory;
+        return this;
+    }
+
+    public RegistryBuilder<T> dummy(DummyFactory<T> factory)
+    {
+        return this.set(factory);
+    }
+
+    public RegistryBuilder<T> set(MissingFactory<T> missing)
+    {
         this.missingFactory = missing;
         return this;
     }
 
-    public RegistryBuilder<T> missing(MissingFactory<T> missing) {
+    public RegistryBuilder<T> missing(MissingFactory<T> missing)
+    {
         return this.set(missing);
     }
 
-    public RegistryBuilder<T> disableSaving() {
+    public RegistryBuilder<T> disableSaving()
+    {
         this.saveToDisc = false;
         return this;
     }
 
-    /**
-     * Prevents the registry from being synced to clients.
-     */
-    public RegistryBuilder<T> disableSync() {
+    public RegistryBuilder<T> disableSync()
+    {
         this.sync = false;
         return this;
     }
 
-    public RegistryBuilder<T> disableOverrides() {
+    public RegistryBuilder<T> disableOverrides()
+    {
         this.allowOverrides = false;
         return this;
     }
 
-    public RegistryBuilder<T> allowModification() {
+    public RegistryBuilder<T> allowModification()
+    {
         this.allowModifications = true;
         return this;
     }
 
-    RegistryBuilder<T> hasWrapper() {
+    RegistryBuilder<T> hasWrapper()
+    {
         this.hasWrapper = true;
         return this;
     }
 
-    public RegistryBuilder<T> legacyName(String name) {
-        return legacyName(ResourceLocation.parse(name));
+    public RegistryBuilder<T> legacyName(String name)
+    {
+        return legacyName(new ResourceLocation(name));
     }
 
-    public RegistryBuilder<T> legacyName(ResourceLocation name) {
+    public RegistryBuilder<T> legacyName(ResourceLocation name)
+    {
         this.legacyNames.add(name);
         return this;
     }
 
-    RegistryBuilder<T> intrusiveHolderCallback(Function<T, Holder.Reference<T>> intrusiveHolderCallback) {
-        this.intrusiveHolderCallback = intrusiveHolderCallback;
+    RegistryBuilder<T> vanillaHolder(Function<T, Holder.Reference<T>> func)
+    {
+        this.vanillaHolder = func;
         return this;
     }
 
@@ -195,7 +223,8 @@ public class RegistryBuilder<T> {
      * @return this builder
      * @see RegistryBuilder#hasWrapper()
      */
-    public RegistryBuilder<T> hasTags() {
+    public RegistryBuilder<T> hasTags()
+    {
         // Tag system heavily relies on Registry<?> objects, so we need a wrapper for this registry to take advantage
         this.hasWrapper();
         return this;
@@ -204,128 +233,158 @@ public class RegistryBuilder<T> {
     /**
      * Modders: Use {@link NewRegistryEvent#create(RegistryBuilder)} instead
      */
-    IForgeRegistry<T> create() {
-        if (hasWrapper) {
-            GameData.WrapperFactory<T> wrapper = GameData.createWrapperFactory(getDefault() != null);
-            this.addCallback.addFirst(wrapper);
-            this.createCallback.addFirst(wrapper);
+    IForgeRegistry<T> create()
+    {
+        if (hasWrapper)
+        {
+            if (getDefault() == null)
+                addCallback(new NamespacedWrapper.Factory<T>());
+            else
+                addCallback(new NamespacedDefaultedWrapper.Factory<T>());
         }
         return RegistryManager.ACTIVE.createRegistry(registryName, this);
     }
 
     @Nullable
-    public AddCallback<T> getAdd() {
+    public AddCallback<T> getAdd()
+    {
         if (addCallback.isEmpty())
             return null;
         if (addCallback.size() == 1)
-            return addCallback.getFirst();
+            return addCallback.get(0);
 
-        var tmp = this.addCallback;
-        return (owner, stage, id, key, obj, old) -> {
-            for (var cb : tmp)
-                cb.onAdd(owner, stage, id, key, obj, old);
+        return (owner, stage, id, obj, old) ->
+        {
+            for (AddCallback<T> cb : this.addCallback)
+                cb.onAdd(owner, stage, id, obj, old);
         };
     }
 
     @Nullable
-    public ClearCallback<T> getClear() {
+    public ClearCallback<T> getClear()
+    {
         if (clearCallback.isEmpty())
             return null;
         if (clearCallback.size() == 1)
-            return clearCallback.getFirst();
+            return clearCallback.get(0);
 
-        var tmp = this.clearCallback;
-        return (owner, stage) -> {
-            for (var cb : tmp)
+        return (owner, stage) ->
+        {
+            for (ClearCallback<T> cb : this.clearCallback)
                 cb.onClear(owner, stage);
         };
     }
 
     @Nullable
-    public CreateCallback<T> getCreate() {
+    public CreateCallback<T> getCreate()
+    {
         if (createCallback.isEmpty())
             return null;
         if (createCallback.size() == 1)
-            return createCallback.getFirst();
+            return createCallback.get(0);
 
-        var tmp = this.createCallback;
-        return (owner, stage) -> {
-            for (var cb : tmp)
+        return (owner, stage) ->
+        {
+            for (CreateCallback<T> cb : this.createCallback)
                 cb.onCreate(owner, stage);
         };
     }
 
     @Nullable
-    public ValidateCallback<T> getValidate() {
+    public ValidateCallback<T> getValidate()
+    {
         if (validateCallback.isEmpty())
             return null;
         if (validateCallback.size() == 1)
-            return validateCallback.getFirst();
+            return validateCallback.get(0);
 
-        var tmp = this.validateCallback;
-        return (owner, stage, id, key, obj) -> {
-            for (var cb : tmp)
+        return (owner, stage, id, key, obj) ->
+        {
+            for (ValidateCallback<T> cb : this.validateCallback)
                 cb.onValidate(owner, stage, id, key, obj);
         };
     }
 
     @Nullable
-    public BakeCallback<T> getBake() {
+    public BakeCallback<T> getBake()
+    {
         if (bakeCallback.isEmpty())
             return null;
         if (bakeCallback.size() == 1)
-            return bakeCallback.getFirst();
+            return bakeCallback.get(0);
 
-        var tmp = this.bakeCallback;
-        return (owner, stage) -> {
-            for (var cb : tmp)
+        return (owner, stage) ->
+        {
+            for (BakeCallback<T> cb : this.bakeCallback)
                 cb.onBake(owner, stage);
         };
     }
 
+    public Class<T> getType()
+    {
+        return registryType;
+    }
+
     @Nullable
-    public ResourceLocation getDefault() {
+    public ResourceLocation getDefault()
+    {
         return this.optionalDefaultKey;
     }
 
-    public int getMinId() {
+    public int getMinId()
+    {
         return minId;
     }
 
-    public int getMaxId() {
+    public int getMaxId()
+    {
         return maxId;
     }
 
-    public boolean getAllowOverrides() {
+    public boolean getAllowOverrides()
+    {
         return allowOverrides;
     }
 
-    public boolean getAllowModifications() {
+    public boolean getAllowModifications()
+    {
         return allowModifications;
     }
 
     @Nullable
-    public MissingFactory<T> getMissingFactory() {
+    public DummyFactory<T> getDummyFactory()
+    {
+        return dummyFactory;
+    }
+
+    @Nullable
+    public MissingFactory<T> getMissingFactory()
+    {
         return missingFactory;
     }
 
-    public boolean getSaveToDisc() {
+    public boolean getSaveToDisc()
+    {
         return saveToDisc;
     }
 
-    public boolean getSync() {
+    public boolean getSync()
+    {
         return sync;
     }
 
-    public Set<ResourceLocation> getLegacyNames() {
+    public Set<ResourceLocation> getLegacyNames()
+    {
         return legacyNames;
     }
 
-    Function<T, Holder.Reference<T>> getIntrusiveHolderCallback() {
-        return this.intrusiveHolderCallback;
+    Function<T, Holder.Reference<T>> getVanillaHolder()
+    {
+        return this.vanillaHolder;
     }
 
-    boolean getHasWrapper() {
+    boolean getHasWrapper()
+    {
         return this.hasWrapper;
     }
 }

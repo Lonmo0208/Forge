@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Forge Development LLC and contributors
+ * Minecraft Forge - Forge Development LLC
  * SPDX-License-Identifier: LGPL-2.1-only
  */
 
@@ -9,8 +9,9 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraftforge.fluids.FluidStack;
 import net.minecraftforge.fluids.IFluidTank;
 import net.minecraftforge.fluids.capability.IFluidHandler;
-import org.jetbrains.annotations.NotNull;
+import net.minecraftforge.fluids.capability.IFluidHandler.FluidAction;
 
+import javax.annotation.Nonnull;
 import java.util.function.Predicate;
 
 /**
@@ -21,7 +22,7 @@ import java.util.function.Predicate;
 public class FluidTank implements IFluidHandler, IFluidTank {
 
     protected Predicate<FluidStack> validator;
-    @NotNull
+    @Nonnull
     protected FluidStack fluid = FluidStack.EMPTY;
     protected int capacity;
 
@@ -60,7 +61,7 @@ public class FluidTank implements IFluidHandler, IFluidTank {
         return capacity;
     }
 
-    @NotNull
+    @Nonnull
     public FluidStack getFluid()
     {
         return fluid;
@@ -91,7 +92,7 @@ public class FluidTank implements IFluidHandler, IFluidTank {
         return 1;
     }
 
-    @NotNull
+    @Nonnull
     @Override
     public FluidStack getFluidInTank(int tank) {
 
@@ -105,7 +106,7 @@ public class FluidTank implements IFluidHandler, IFluidTank {
     }
 
     @Override
-    public boolean isFluidValid(int tank, @NotNull FluidStack stack) {
+    public boolean isFluidValid(int tank, @Nonnull FluidStack stack) {
 
         return isFluidValid(stack);
     }
@@ -155,7 +156,7 @@ public class FluidTank implements IFluidHandler, IFluidTank {
         return filled;
     }
 
-    @NotNull
+    @Nonnull
     @Override
     public FluidStack drain(FluidStack resource, FluidAction action)
     {
@@ -166,7 +167,7 @@ public class FluidTank implements IFluidHandler, IFluidTank {
         return drain(resource.getAmount(), action);
     }
 
-    @NotNull
+    @Nonnull
     @Override
     public FluidStack drain(int maxDrain, FluidAction action)
     {

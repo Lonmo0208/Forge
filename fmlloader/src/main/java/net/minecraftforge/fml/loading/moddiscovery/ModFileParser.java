@@ -1,6 +1,20 @@
 /*
- * Copyright (c) Forge Development LLC and contributors
- * SPDX-License-Identifier: LGPL-2.1-only
+ * Minecraft Forge
+ * Copyright (c) 2016-2021.
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation version 2.1
+ * of the License.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
 package net.minecraftforge.fml.loading.moddiscovery;
@@ -8,13 +22,12 @@ package net.minecraftforge.fml.loading.moddiscovery;
 import com.electronwill.nightconfig.core.file.FileConfig;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
-import com.mojang.logging.LogUtils;
 import net.minecraftforge.fml.loading.LogMarkers;
 import net.minecraftforge.forgespi.language.IModFileInfo;
 import net.minecraftforge.forgespi.locating.IModFile;
 import net.minecraftforge.forgespi.locating.ModFileFactory;
-import org.jetbrains.annotations.Nullable;
-import org.slf4j.Logger;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import java.io.IOException;
 import java.lang.reflect.Type;
@@ -23,15 +36,16 @@ import java.nio.file.Path;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 public class ModFileParser {
-    private static final Logger LOGGER = LogUtils.getLogger();
+    private static final Logger LOGGER = LogManager.getLogger();
 
     public static IModFileInfo readModList(final ModFile modFile, final ModFileFactory.ModFileInfoParser parser) {
         return parser.build(modFile);
     }
 
-    public static @Nullable IModFileInfo modsTomlParser(final IModFile imodFile) {
+    public static IModFileInfo modsTomlParser(final IModFile imodFile) {
         ModFile modFile = (ModFile) imodFile;
         LOGGER.debug(LogMarkers.LOADING,"Considering mod file candidate {}", modFile.getFilePath());
         final Path modsjson = modFile.findResource("META-INF", "mods.toml");
@@ -44,7 +58,9 @@ public class ModFileParser {
         fileConfig.load();
         fileConfig.close();
         final NightConfigWrapper configWrapper = new NightConfigWrapper(fileConfig);
-        return new ModFileInfo(modFile, configWrapper, configWrapper::setFile);
+        final ModFileInfo modFileInfo = new ModFileInfo(modFile, configWrapper);
+        configWrapper.setFile(modFileInfo);
+        return modFileInfo;
     }
 
     protected static List<CoreModFile> getCoreMods(final ModFile modFile) {
@@ -65,6 +81,6 @@ public class ModFileParser {
         return coreModPaths.entrySet().stream()
                 .peek(e-> LOGGER.debug(LogMarkers.LOADING,"Found coremod {} with Javascript path {}", e.getKey(), e.getValue()))
                 .map(e -> new CoreModFile(e.getKey(), modFile.findResource(e.getValue()),modFile))
-                .toList();
+                .collect(Collectors.toList());
     }
 }

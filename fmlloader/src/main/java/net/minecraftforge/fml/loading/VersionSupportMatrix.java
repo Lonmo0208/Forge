@@ -1,6 +1,20 @@
 /*
- * Copyright (c) Forge Development LLC and contributors
- * SPDX-License-Identifier: LGPL-2.1-only
+ * Minecraft Forge
+ * Copyright (c) 2016-2021.
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation version 2.1
+ * of the License.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
 package net.minecraftforge.fml.loading;
@@ -8,50 +22,33 @@ package net.minecraftforge.fml.loading;
 import org.apache.maven.artifact.versioning.ArtifactVersion;
 import org.apache.maven.artifact.versioning.DefaultArtifactVersion;
 import org.apache.maven.artifact.versioning.VersionRange;
-import org.jetbrains.annotations.ApiStatus;
 
-import java.util.Collections;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.function.BiPredicate;
 
-@ApiStatus.Internal // since 1.21.1, will be made non-public in a later MC version
 public class VersionSupportMatrix {
-    private static final Map<String, List<ArtifactVersion>> OVERRIDE_VERSIONS;
-
+    private static final HashMap<String, List<ArtifactVersion>> overrideVersions = new HashMap<>();
     static {
-        if ("1.21.1".equals(FMLLoader.versionInfo().mcVersion())) {
-            OVERRIDE_VERSIONS = Map.ofEntries(
-                    // 1.21.1 is compatible with 1.21
-                    entry("languageloader.javafml", "51"),
-                    entry("mod.minecraft",          "1.21"),
-                    entry("mod.forge",              "51.0.33")
-            );
-        } else {
-            OVERRIDE_VERSIONS = Collections.emptyMap();
-        }
+        final ArtifactVersion version = new DefaultArtifactVersion(FMLLoader.versionInfo().mcVersion());
+        // if (MavenVersionAdapter.createFromVersionSpec("[1.16.4,1.16.5]").containsVersion(version)) {
+        //     // 1.16.4 is Compatible with 1.16.3
+        //     add("languageloader.javafml", "34");
+        //     add("mod.minecraft",          "1.16.3");
+        //     add("mod.forge",              "34.1.42");
+        //     // 1.16.5 is Compatible with 1.16.4, and thus 1.16.3
+        //     add("languageloader.javafml", "35");
+        //     add("mod.minecraft",          "1.16.4");
+        //     add("mod.forge",              "35.1.37");
+        // }
     }
-
-    /**
-     * @deprecated Use {@link #testVersionSupportMatrix(VersionRange, String, String)} instead, unwrapping your BiPredicate.
-     */
-    @Deprecated(forRemoval = true, since = "1.21.1")
-    public static boolean testVersionSupportMatrix(VersionRange declaredRange, String lookupId, String type, BiPredicate<String, VersionRange> standardLookup) {
+    private static void add(String key, String value) {
+        overrideVersions.computeIfAbsent(key, k -> new ArrayList<>()).add(new DefaultArtifactVersion(value));
+    }
+    public static <T> boolean testVersionSupportMatrix(VersionRange declaredRange, String lookupId, String type, BiPredicate<String, VersionRange> standardLookup) {
         if (standardLookup.test(lookupId, declaredRange)) return true;
-        return testVersionSupportMatrix(declaredRange, lookupId, type);
-    }
-
-    public static boolean testVersionSupportMatrix(VersionRange declaredRange, String lookupId, String type) {
-        if (OVERRIDE_VERSIONS.isEmpty()) return false;
-        List<ArtifactVersion> custom = OVERRIDE_VERSIONS.get(type + "." + lookupId);
-        return custom != null && custom.stream().anyMatch(declaredRange::containsVersion);
-    }
-
-    private static Map.Entry<String, List<ArtifactVersion>> entry(String typeAndLookupId, String declaredRange) {
-        return Map.entry(typeAndLookupId, List.of(new DefaultArtifactVersion(declaredRange)));
-    }
-
-    private static Map.Entry<String, List<ArtifactVersion>> entry(String typeAndLookupId, List<String> declaredRanges) {
-        return Map.entry(typeAndLookupId, declaredRanges.stream().map(DefaultArtifactVersion::new).map(it -> (ArtifactVersion) it).toList());
+        List<ArtifactVersion> custom = overrideVersions.get(type +"." +lookupId);
+        return custom == null ? false  : custom.stream().anyMatch(declaredRange::containsVersion);
     }
 }

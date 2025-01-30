@@ -1,40 +1,38 @@
 --- a/net/minecraft/world/item/Items.java
 +++ b/net/minecraft/world/item/Items.java
-@@ -2078,7 +_,25 @@
-     }
+@@ -15,6 +_,7 @@
+ import net.minecraft.world.level.block.entity.BannerPattern;
+ import net.minecraft.world.level.material.Fluids;
  
-     public static Item registerBlock(Block p_252092_, Block... p_248886_) {
--        Item item = registerBlock(p_252092_);
-+        Item item = registerBlock(p_252092_, (block_, prop_) -> {
-+            return new BlockItem(block_, prop_) {
-+                @Override
-+                public void registerBlocks(java.util.Map<Block, Item> map, Item self) {
-+                    super.registerBlocks(map, self);
-+                    for (var b : p_248886_) {
-+                        map.put(b, self);
-+                    }
-+                }
-+
-+                @Override
-+                public void removeFromBlockToItemMap(java.util.Map<Block, Item> map, Item self) {
-+                    super.removeFromBlockToItemMap(map, self);
-+                    for (var b : p_248886_) {
-+                        map.remove(b);
-+                    }
-+                }
-+            };
-+        });
++@net.minecraftforge.registries.ObjectHolder("minecraft")
+ public class Items {
+    public static final Item f_41852_ = m_42810_(Blocks.f_50016_, new AirItem(Blocks.f_50016_, new Item.Properties()));
+    public static final Item f_213842_ = m_42803_(new GenericItemBlock.GenericBlockItem(Blocks.f_213995_, (new Item.Properties()).m_41491_(CreativeModeTab.f_40749_)));
+@@ -1143,11 +_,23 @@
+    }
  
-         for (Block block : p_248886_) {
-             Item.BY_BLOCK.put(block, item);
-@@ -2117,10 +_,6 @@
+    private static Item m_151089_(Block p_151090_, CreativeModeTab p_151091_, Block... p_151092_) {
+-      BlockItem blockitem = new BlockItem(p_151090_, (new Item.Properties()).m_41491_(p_151091_));
++      BlockItem blockitem = new BlockItem(p_151090_, (new Item.Properties()).m_41491_(p_151091_)) {
++         @Override
++         public void m_6192_(java.util.Map<Block, Item> map, Item self) {
++            super.m_6192_(map, self);
++            for (Block b : p_151092_) {
++               map.put(b, self);
++            }
++         }
  
-     public static Item registerItem(ResourceKey<Item> p_364577_, Function<Item.Properties, Item> p_366144_, Item.Properties p_369845_) {
-         Item item = p_366144_.apply(p_369845_.setId(p_364577_));
--        if (item instanceof BlockItem blockitem) {
--            blockitem.registerBlocks(Item.BY_BLOCK, item);
--        }
--
-         return Registry.register(BuiltInRegistries.ITEM, p_364577_, item);
-     }
- }
+-      for(Block block : p_151092_) {
+-         Item.f_41373_.put(block, blockitem);
+-      }
++         @Override
++         public void removeFromBlockToItemMap(java.util.Map<Block, Item> map, Item self) {
++            super.removeFromBlockToItemMap(map, self);
++            for (Block b : p_151092_) {
++               map.remove(b);
++            }
++         }
++      };
+ 
+       return m_42803_(blockitem);
+    }

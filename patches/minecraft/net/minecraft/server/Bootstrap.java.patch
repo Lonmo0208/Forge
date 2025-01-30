@@ -1,19 +1,19 @@
 --- a/net/minecraft/server/Bootstrap.java
 +++ b/net/minecraft/server/Bootstrap.java
-@@ -57,6 +_,8 @@
-                     CauldronInteraction.bootStrap();
-                     BuiltInRegistries.bootStrap();
-                     CreativeModeTabs.validate();
-+                    net.minecraftforge.registries.GameData.vanillaSnapshot();
-+                    if (false) // skip redirectOutputToLog, Forge already redirects stdout and stderr output to log so that they print with more context
-                     wrapStreams();
-                     bootstrapDuration.set(Duration.between(instant, Instant.now()).toMillis());
-                 }
-@@ -123,7 +_,6 @@
-             Commands.validate();
-         }
+@@ -55,6 +_,8 @@
+                CauldronInteraction.m_175649_();
+                ArgumentTypes.m_121586_();
+                Registry.m_206101_();
++               net.minecraftforge.registries.GameData.vanillaSnapshot();
++               if (false) // skip redirectOutputToLog, Forge already redirects stdout and stderr output to log so that they print with more context
+                m_135890_();
+             }
+          }
+@@ -128,7 +_,6 @@
+          m_197757_();
+       }
  
--        DefaultAttributes.validate();
-     }
+-      DefaultAttributes.m_22296_();
+    }
  
-     private static void wrapStreams() {
+    private static void m_197757_() {

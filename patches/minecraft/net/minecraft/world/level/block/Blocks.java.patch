@@ -1,26 +1,36 @@
 --- a/net/minecraft/world/level/block/Blocks.java
 +++ b/net/minecraft/world/level/block/Blocks.java
-@@ -758,7 +_,7 @@
-     public static final Block RED_BED = registerBed("red_bed", DyeColor.RED);
-     public static final Block BLACK_BED = registerBed("black_bed", DyeColor.BLACK);
-     public static final Block POWERED_RAIL = register(
--        "powered_rail", PoweredRailBlock::new, BlockBehaviour.Properties.of().noCollission().strength(0.7F).sound(SoundType.METAL)
-+        "powered_rail", prop -> new PoweredRailBlock(prop, true), BlockBehaviour.Properties.of().noCollission().strength(0.7F).sound(SoundType.METAL)
-     );
-     public static final Block DETECTOR_RAIL = register(
-         "detector_rail", DetectorRailBlock::new, BlockBehaviour.Properties.of().noCollission().strength(0.7F).sound(SoundType.METAL)
-@@ -6585,14 +_,5 @@
+@@ -35,6 +_,7 @@
+ import net.minecraft.world.level.material.Material;
+ import net.minecraft.world.level.material.MaterialColor;
  
-     private static Block register(String p_50796_, BlockBehaviour.Properties p_362760_) {
-         return register(p_50796_, Block::new, p_362760_);
--    }
++@net.minecraftforge.registries.ObjectHolder("minecraft")
+ public class Blocks {
+    public static final Block f_50016_ = m_50795_("air", new AirBlock(BlockBehaviour.Properties.m_60939_(Material.f_76296_).m_60910_().m_60993_().m_60996_()));
+    public static final Block f_213995_ = m_50795_("generic_item_block", new GenericItemBlock(BlockBehaviour.Properties.m_60939_(Material.f_76280_).m_60910_().m_60978_(0.25F)));
+@@ -136,7 +_,7 @@
+    public static final Block f_50027_ = m_50795_("green_bed", m_50764_(DyeColor.GREEN));
+    public static final Block f_50028_ = m_50795_("red_bed", m_50764_(DyeColor.RED));
+    public static final Block f_50029_ = m_50795_("black_bed", m_50764_(DyeColor.BLACK));
+-   public static final Block f_50030_ = m_50795_("powered_rail", new PoweredRailBlock(BlockBehaviour.Properties.m_60939_(Material.f_76310_).m_60910_().m_60978_(0.7F).m_60918_(SoundType.f_56743_)));
++   public static final Block f_50030_ = m_50795_("powered_rail", new PoweredRailBlock(BlockBehaviour.Properties.m_60939_(Material.f_76310_).m_60910_().m_60978_(0.7F).m_60918_(SoundType.f_56743_), true));
+    public static final Block f_50031_ = m_50795_("detector_rail", new DetectorRailBlock(BlockBehaviour.Properties.m_60939_(Material.f_76310_).m_60910_().m_60978_(0.7F).m_60918_(SoundType.f_56743_)));
+    public static final Block f_50032_ = m_50795_("sticky_piston", m_50798_(true));
+    public static final Block f_50033_ = m_50795_("cobweb", new WebBlock(BlockBehaviour.Properties.m_60939_(Material.f_76311_).m_60910_().m_60999_().m_60978_(4.0F)));
+@@ -1117,16 +_,5 @@
+ 
+    public static void m_50758_() {
+       Block.f_49791_.forEach(BlockBehaviour.BlockStateBase::m_60611_);
+-   }
 -
--    static {
--        for (Block block : BuiltInRegistries.BLOCK) {
--            for (BlockState blockstate : block.getStateDefinition().getPossibleStates()) {
--                Block.BLOCK_STATE_REGISTRY.add(blockstate);
--                blockstate.initCache();
--            }
--        }
-     }
+-   static {
+-      for(Block block : Registry.f_122824_) {
+-         for(BlockState blockstate : block.m_49965_().m_61056_()) {
+-            Block.f_49791_.m_122667_(blockstate);
+-         }
+-
+-         block.m_60589_();
+-      }
+-
+    }
  }

@@ -1,51 +1,46 @@
 --- a/net/minecraft/server/ReloadableServerResources.java
 +++ b/net/minecraft/server/ReloadableServerResources.java
-@@ -26,6 +_,7 @@
-     private final ServerAdvancementManager advancements;
-     private final ServerFunctionLibrary functionLibrary;
-     private final List<Registry.PendingTags<?>> postponedTags;
-+    private final net.minecraftforge.common.crafting.conditions.ICondition.IContext context;
+@@ -28,18 +_,22 @@
+    private static final Logger f_206845_ = LogUtils.getLogger();
+    private static final CompletableFuture<Unit> f_206846_ = CompletableFuture.completedFuture(Unit.INSTANCE);
+    private final Commands f_206847_;
+-   private final RecipeManager f_206848_ = new RecipeManager();
++   private final RecipeManager f_206848_;
+    private final TagManager f_206849_;
+    private final PredicateManager f_206850_ = new PredicateManager();
+    private final LootTables f_206851_ = new LootTables(this.f_206850_);
+    private final ItemModifierManager f_206852_ = new ItemModifierManager(this.f_206850_, this.f_206851_);
+-   private final ServerAdvancementManager f_206853_ = new ServerAdvancementManager(this.f_206850_);
++   private final ServerAdvancementManager f_206853_;
+    private final ServerFunctionLibrary f_206854_;
  
-     private ReloadableServerResources(
-         LayeredRegistryAccess<RegistryLayer> p_368059_,
-@@ -37,9 +_,11 @@
-     ) {
-         this.fullRegistryHolder = new ReloadableServerRegistries.Holder(p_368059_.compositeAccess());
-         this.postponedTags = p_364269_;
--        this.recipes = new RecipeManager(p_363207_);
-         this.commands = new Commands(p_206858_, CommandBuildContext.simple(p_363207_, p_250695_));
--        this.advancements = new ServerAdvancementManager(p_363207_);
-+        // Forge: Create context object and pass it to the recipe manager.
-+        this.context = new net.minecraftforge.common.crafting.conditions.ConditionContext(this.postponedTags);
-+        this.recipes = new RecipeManager(p_363207_, this.context);
-+        this.advancements = new ServerAdvancementManager(p_363207_, this.context);
-         this.functionLibrary = new ServerFunctionLibrary(p_206859_, this.commands.getDispatcher());
-     }
+    public ReloadableServerResources(RegistryAccess.Frozen p_206857_, Commands.CommandSelection p_206858_, int p_206859_) {
+       this.f_206849_ = new TagManager(p_206857_);
+       this.f_206847_ = new Commands(p_206858_);
+       this.f_206854_ = new ServerFunctionLibrary(p_206859_, this.f_206847_.m_82094_());
++      // Forge: pass condition context too
++      var context = new net.minecraftforge.common.crafting.conditions.ConditionContext(this.f_206849_);
++      this.f_206848_ = new RecipeManager(context);
++      this.f_206853_ = new ServerAdvancementManager(this.f_206850_, context);
+    }
  
-@@ -83,8 +_,10 @@
-                     ReloadableServerResources reloadableserverresources = new ReloadableServerResources(
-                         p_358539_.layers(), p_358539_.lookupWithUpdatedTags(), p_250212_, p_249301_, p_366334_, p_251126_
-                     );
-+                    var listeners = new java.util.ArrayList<>(reloadableserverresources.listeners());
-+                    listeners.addAll(net.minecraftforge.event.ForgeEventFactory.onResourceReload(reloadableserverresources, p_330376_.compositeAccess()));
-                     return SimpleReloadInstance.create(
--                            p_248588_, reloadableserverresources.listeners(), p_249136_, p_249601_, DATA_RELOAD_INITIAL_TASK, LOGGER.isDebugEnabled()
-+                            p_248588_, listeners, p_249136_, p_249601_, DATA_RELOAD_INITIAL_TASK, LOGGER.isDebugEnabled()
-                         )
-                         .done()
-                         .thenApply(p_214306_ -> reloadableserverresources);
-@@ -94,5 +_,14 @@
+    public ServerFunctionLibrary m_206860_() {
+@@ -76,7 +_,9 @@
  
-     public void updateStaticRegistryTags() {
-         this.postponedTags.forEach(Registry.PendingTags::apply);
-+    }
-+
-+    /**
-+     * Exposes the current condition context for usage in other reload listeners.<br>
-+     * This is not useful outside the reloading stage.
-+     * @return The condition context for the currently active reload.
-+     */
-+    public net.minecraftforge.common.crafting.conditions.ICondition.IContext getConditionContext() {
-+        return this.context;
-     }
- }
+    public static CompletableFuture<ReloadableServerResources> m_206861_(ResourceManager p_206862_, RegistryAccess.Frozen p_206863_, Commands.CommandSelection p_206864_, int p_206865_, Executor p_206866_, Executor p_206867_) {
+       ReloadableServerResources reloadableserverresources = new ReloadableServerResources(p_206863_, p_206864_, p_206865_);
+-      return SimpleReloadInstance.m_203834_(p_206862_, reloadableserverresources.m_206890_(), p_206866_, p_206867_, f_206846_, f_206845_.isDebugEnabled()).m_7237_().thenApply((p_206880_) -> {
++      List<PreparableReloadListener> listeners = new java.util.ArrayList<>(reloadableserverresources.m_206890_());
++      listeners.addAll(net.minecraftforge.event.ForgeEventFactory.onResourceReload(reloadableserverresources));
++      return SimpleReloadInstance.m_203834_(p_206862_, listeners, p_206866_, p_206867_, f_206846_, f_206845_.isDebugEnabled()).m_7237_().thenApply((p_206880_) -> {
+          return reloadableserverresources;
+       });
+    }
+@@ -86,6 +_,7 @@
+          m_206870_(p_206869_, p_206884_);
+       });
+       Blocks.m_50758_();
++      net.minecraftforge.common.MinecraftForge.EVENT_BUS.post(new net.minecraftforge.event.TagsUpdatedEvent(p_206869_));
+    }
+ 
+    private static <T> void m_206870_(RegistryAccess p_206871_, TagManager.LoadResult<T> p_206872_) {

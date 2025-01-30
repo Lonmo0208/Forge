@@ -1,12 +1,13 @@
 /*
- * Copyright (c) Forge Development LLC and contributors
+ * Minecraft Forge - Forge Development LLC
  * SPDX-License-Identifier: LGPL-2.1-only
  */
 
 package net.minecraftforge.items;
 
 import net.minecraft.world.item.ItemStack;
-import org.jetbrains.annotations.NotNull;
+
+import javax.annotation.Nonnull;
 
 public interface IItemHandlerModifiable extends IItemHandler
 {
@@ -21,5 +22,5 @@ public interface IItemHandlerModifiable extends IItemHandler
      * @throws RuntimeException if the handler is called in a way that the handler
      * was not expecting.
      **/
-    void setStackInSlot(int slot, @NotNull ItemStack stack);
+    void setStackInSlot(int slot, @Nonnull ItemStack stack);
 }

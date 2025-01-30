@@ -6,7 +6,6 @@ import org.gradle.api.file.ConfigurableFileCollection
 import org.gradle.api.file.RegularFileProperty
 import org.gradle.api.provider.SetProperty
 import org.gradle.api.tasks.*
-import org.gradle.api.tasks.bundling.AbstractArchiveTask
 
 import java.nio.file.Files
 
@@ -17,80 +16,59 @@ abstract class LauncherJson extends DefaultTask {
     @OutputFile abstract RegularFileProperty getOutput()
     @InputFiles abstract ConfigurableFileCollection getInput()
     @Input Map<String, Object> json = new LinkedHashMap<>()
+    @Input @Optional abstract SetProperty<String> getPackedDependencies()
+    
+    @Internal final vanilla = project.project(':mcp').file('build/mcp/downloadJson/version.json')
+    @Internal final timestamp = iso8601Now()
+    @Internal final comment = [
+        "Please do not automate the download and installation of Forge.",
+        "Our efforts are supported by ads from the download page.",
+        "If you MUST automate this, please consider supporting the project through https://www.patreon.com/LexManos/"
+    ]
+    @Internal final id = "${project.rootProject.ext.MC_VERSION}-${project.name}${project.version.substring(project.rootProject.ext.MC_VERSION.length())}"
 
     LauncherJson() {
-        output.convention(project.layout.buildDirectory.file('libs/version.json'))
+        getOutput().convention(project.layout.buildDirectory.file('version.json'))
 
-        dependsOn(project.tasks.universalJar)
-        input.from(project.tasks.universalJar.archiveFile)
-        input.from(project.configurations.installer)
-        input.from(project.configurations.installerextra)
-        configure {
-            def mc    = project.rootProject.ext.MC_VERSION
-            def forge = project.rootProject.ext.FORGE_VERSION
-            def timestamp = iso8601Now()
-            json.putAll([
-                _comment: [
-                    "Please do not automate the download and installation of Forge.",
-                    "Our efforts are supported by ads from the download page.",
-                    "If you MUST automate this, please consider supporting the project through https://www.patreon.com/LexManos/"
-                ],
-                id: "$mc-$project.name-$forge",
-                time: timestamp,
-                releaseTime: timestamp,
-                inheritsFrom: mc,
-                type: 'release',
-                logging: [:],
-                mainClass: '',
-                libraries: []
-            ] as LinkedHashMap)
-            
-            [
-                project.tasks.universalJar
-            ].forEach { packed ->
-                dependsOn(packed)
-                input.from packed.archiveFile
+        dependsOn(':fmlloader:jar', 'universalJar')
+        getInput().from(project.tasks.universalJar.archiveFile,
+                project.project(':fmlloader').jar.archiveFile,
+                vanilla)
+                
+        project.afterEvaluate {
+            packedDependencies.get().forEach {
+                def jarTask = project.rootProject.tasks.findByPath(it)
+                dependsOn(jarTask)
+                input.from jarTask.archiveFile
             }
-            
-            def patched = project.tasks.applyClientBinPatches
-            dependsOn(patched)
-            input.from patched.output
         }
     }
 
     @TaskAction
     protected void exec() {
-        var packed = (AbstractArchiveTask) project.tasks.universalJar
-        def info = Util.getMavenInfoFromTask(packed)
-        json.libraries.add([
-            name: info.name,
-            downloads: [
-                artifact: [
-                    path: info.path,
-                    url: "https://maven.minecraftforge.net/$info.path",
-                    sha1: packed.archiveFile.get().asFile.sha1(),
-                    size: packed.archiveFile.get().asFile.length()
+        if (!json.libraries)
+            json.libraries = []
+        def libs = [:]
+        getArtifacts(project, project.configurations.installer, false).each { key, lib -> libs[key] = lib }
+        getArtifacts(project, project.configurations.moduleonly, false).each { key, lib -> libs[key] = lib }
+
+        packedDependencies.get().collect{ project.rootProject.tasks.findByPath(it) }.forEach {
+            def path = Util.getMavenPath(it)
+            def key = Util.getMavenDep(it)
+            
+            libs[key] = [
+                name: key,
+                downloads: [
+                    artifact: [
+                        path: path,
+                        url: "https://maven.minecraftforge.net/${path}",
+                        sha1: it.archiveFile.get().asFile.sha1(),
+                        size: it.archiveFile.get().asFile.length()
+                    ]
                 ]
             ]
-        ])
-
-        var classifier = 'client'
-        var genned = project.tasks.applyClientBinPatches
-        info = Util.getMavenInfoFromTask(genned, classifier)
-        json.libraries.add([
-            name: info.name,
-            downloads: [
-                artifact: [
-                    path: info.path,
-                    url: "",
-                    sha1: genned.output.get().asFile.sha1(),
-                    size: genned.output.get().asFile.length()
-                ]
-            ]
-        ])
-
-        json.libraries.addAll(getArtifacts(project.configurations.installerextra).values())
-        json.libraries.addAll(getArtifacts(project.configurations.installer).values())
+        }
+        libs.each { key, lib -> json.libraries.add(lib) }
         Files.writeString(output.get().asFile.toPath(), new JsonBuilder(json).toPrettyString())
     }
 }

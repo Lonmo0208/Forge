@@ -1,30 +1,28 @@
 /*
- * Copyright (c) Forge Development LLC and contributors
+ * Minecraft Forge - Forge Development LLC
  * SPDX-License-Identifier: LGPL-2.1-only
  */
 
 package net.minecraftforge.registries;
 
-import org.jetbrains.annotations.ApiStatus;
-
 import net.minecraftforge.eventbus.api.IEventBus;
 
-@ApiStatus.Internal
-public class ForgeDeferredRegistriesSetup {
+public class ForgeDeferredRegistriesSetup
+{
     private static boolean setup = false;
 
     /**
      * Internal forge method. Modders do not call.
      */
-    public static void setup(IEventBus modEventBus) {
-        synchronized (ForgeDeferredRegistriesSetup.class) {
-            if (setup)
-                throw new IllegalStateException("Setup has already been called!");
+    public static void setup(IEventBus modEventBus)
+    {
+        if (setup)
+            throw new IllegalStateException("Setup has already been called!");
 
-            setup = true;
-        }
+        ForgeRegistries.DEFERRED_DATA_SERIALIZERS.register(modEventBus);
+        ForgeRegistries.DEFERRED_LOOT_MODIFIER_SERIALIZERS.register(modEventBus);
+        ForgeRegistries.DEFERRED_WORLD_TYPES.register(modEventBus);
 
-        for (var reg : ForgeRegistries.registries)
-            reg.register(modEventBus);
+        setup = true;
     }
 }

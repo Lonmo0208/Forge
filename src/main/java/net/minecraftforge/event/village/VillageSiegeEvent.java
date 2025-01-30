@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Forge Development LLC and contributors
+ * Minecraft Forge - Forge Development LLC
  * SPDX-License-Identifier: LGPL-2.1-only
  */
 
@@ -27,14 +27,14 @@ import net.minecraftforge.eventbus.api.Event;
 public class VillageSiegeEvent extends Event
 {
     private final VillageSiege siege;
-    private final Level level;
+    private final Level world;
     private final Player player;
     private final Vec3 attemptedSpawnPos;
 
-    public VillageSiegeEvent(VillageSiege siege, Level level, Player player, Vec3 attemptedSpawnPos)
+    public VillageSiegeEvent(VillageSiege siege, Level world, Player player, Vec3 attemptedSpawnPos)
     {
        this.siege = siege;
-       this.level = level;
+       this.world = world;
        this.player = player;
        this.attemptedSpawnPos = attemptedSpawnPos;
     }
@@ -44,9 +44,9 @@ public class VillageSiegeEvent extends Event
         return siege;
     }
 
-    public Level getLevel()
+    public Level getWorld()
     {
-        return level;
+        return world;
     }
 
     public Player getPlayer()

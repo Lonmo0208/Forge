@@ -1,14 +1,16 @@
 /*
- * Copyright (c) Forge Development LLC and contributors
+ * Minecraft Forge - Forge Development LLC
  * SPDX-License-Identifier: LGPL-2.1-only
  */
 
 package net.minecraftforge.fluids.capability.templates;
 
+import javax.annotation.Nonnull;
+
 import net.minecraftforge.fluids.FluidStack;
 import net.minecraftforge.fluids.capability.IFluidHandler;
 
-import org.jetbrains.annotations.NotNull;
+import net.minecraftforge.fluids.capability.IFluidHandler.FluidAction;
 
 public class EmptyFluidHandler implements IFluidHandler
 {
@@ -19,7 +21,7 @@ public class EmptyFluidHandler implements IFluidHandler
     @Override
     public int getTanks() { return 1; }
 
-    @NotNull
+    @Nonnull
     @Override
     public FluidStack getFluidInTank(int tank) { return FluidStack.EMPTY; }
 
@@ -27,7 +29,7 @@ public class EmptyFluidHandler implements IFluidHandler
     public int getTankCapacity(int tank) { return 0; }
 
     @Override
-    public boolean isFluidValid(int tank, @NotNull FluidStack stack) { return true; }
+    public boolean isFluidValid(int tank, @Nonnull FluidStack stack) { return true; }
 
     @Override
     public int fill(FluidStack resource, FluidAction action)
@@ -35,14 +37,14 @@ public class EmptyFluidHandler implements IFluidHandler
         return 0;
     }
 
-    @NotNull
+    @Nonnull
     @Override
     public FluidStack drain(FluidStack resource, FluidAction action)
     {
         return FluidStack.EMPTY;
     }
 
-    @NotNull
+    @Nonnull
     @Override
     public FluidStack drain(int maxDrain, FluidAction action)
     {

@@ -1,66 +1,79 @@
 --- a/net/minecraft/world/entity/monster/Zombie.java
 +++ b/net/minecraft/world/entity/monster/Zombie.java
-@@ -262,21 +_,28 @@
-     }
- 
-     protected void convertToZombieType(EntityType<? extends Zombie> p_34311_) {
-+        if (!net.minecraftforge.event.ForgeEventFactory.canLivingConvert(this, p_34311_, timer -> this.conversionTime = timer)) return;
-         this.convertTo(
-             p_34311_,
-             ConversionParams.single(this, true, true),
--            p_375145_ -> p_375145_.handleAttributes(p_375145_.level().getCurrentDifficultyAt(p_375145_.blockPosition()).getSpecialMultiplier())
-+            p_375145_ -> {
-+                p_375145_.handleAttributes(p_375145_.level().getCurrentDifficultyAt(p_375145_.blockPosition()).getSpecialMultiplier());
-+                net.minecraftforge.event.ForgeEventFactory.onLivingConvert(this, p_375145_);
-+            }
-         );
-     }
- 
-     @VisibleForTesting
-     public boolean convertVillagerToZombieVillager(ServerLevel p_369430_, Villager p_360910_) {
-+        if (!net.minecraftforge.event.ForgeEventFactory.canLivingConvert(p_360910_, EntityType.ZOMBIE_VILLAGER, (timer) -> {}))
-+            return false;
-         ZombieVillager zombievillager = p_360910_.convertTo(EntityType.ZOMBIE_VILLAGER, ConversionParams.single(p_360910_, true, true), p_359258_ -> {
-             p_359258_.finalizeSpawn(p_369430_, p_369430_.getCurrentDifficultyAt(p_359258_.blockPosition()), EntitySpawnReason.CONVERSION, new Zombie.ZombieGroupData(false, true));
-             p_359258_.setVillagerData(p_360910_.getVillagerData());
-             p_359258_.setGossips(p_360910_.getGossips().store(NbtOps.INSTANCE));
-             p_359258_.setTradeOffers(p_360910_.getOffers().copy());
-             p_359258_.setVillagerXp(p_360910_.getVillagerXp());
-+            net.minecraftforge.event.ForgeEventFactory.onLivingConvert(p_360910_, p_359258_);
-             if (!this.isSilent()) {
-                 p_369430_.levelEvent(null, 1026, this.blockPosition(), 0);
+@@ -190,7 +_,7 @@
+       if (!this.f_19853_.f_46443_ && this.m_6084_() && !this.m_21525_()) {
+          if (this.m_34329_()) {
+             --this.f_34266_;
+-            if (this.f_34266_ < 0) {
++            if (this.f_34266_ < 0 && net.minecraftforge.event.ForgeEventFactory.canLivingConvert(this, EntityType.f_20562_, (timer) -> this.f_34266_ = timer)) {
+                this.m_7595_();
              }
-@@ -298,19 +_,26 @@
-                 livingentity = (LivingEntity)p_363403_.getEntity();
-             }
+          } else if (this.m_7593_()) {
+@@ -252,6 +_,7 @@
+       if (zombie != null) {
+          zombie.m_34339_(zombie.f_19853_.m_6436_(zombie.m_142538_()).m_19057_());
+          zombie.m_34336_(zombie.m_7586_() && this.m_34330_());
++         net.minecraftforge.event.ForgeEventFactory.onLivingConvert(this, zombie);
+       }
  
--            if (livingentity != null
-+            var vanilla = (livingentity != null
-                 && p_363771_.getDifficulty() == Difficulty.HARD
-                 && (double)this.random.nextFloat() < this.getAttributeValue(Attributes.SPAWN_REINFORCEMENTS_CHANCE)
--                && p_363771_.getGameRules().getBoolean(GameRules.RULE_DOMOBSPAWNING)) {
-+                && p_363771_.getGameRules().getBoolean(GameRules.RULE_DOMOBSPAWNING));
-                 int i = Mth.floor(this.getX());
-                 int j = Mth.floor(this.getY());
-                 int k = Mth.floor(this.getZ());
-                 EntityType<? extends Zombie> entitytype = this.getType();
--                Zombie zombie = entitytype.create(p_363771_, EntitySpawnReason.REINFORCEMENT);
--                if (zombie == null) {
--                    return true;
--                }
--
-+
-+            var event = net.minecraftforge.event.ForgeEventFactory.fireZombieSummonAid(this, level(), i, j, k, livingentity, this.getAttributeValue(Attributes.SPAWN_REINFORCEMENTS_CHANCE));
-+
-+            Zombie zombie = null;
-+            if (event.getResult().isAllowed() || (vanilla && event.getResult().isDefault())) {
-+                if (event.getCustomSummonedAid() != null)
-+                    zombie = event.getCustomSummonedAid();
-+                else
-+                    zombie = entitytype.create(this.level(), EntitySpawnReason.REINFORCEMENT);
-+            }
-+
-+            if (zombie != null) {
-                 for (int l = 0; l < 50; l++) {
-                     int i1 = i + Mth.nextInt(this.random, 7, 40) * Mth.nextInt(this.random, -1, 1);
-                     int j1 = j + Mth.nextInt(this.random, 7, 40) * Mth.nextInt(this.random, -1, 1);
+    }
+@@ -272,11 +_,14 @@
+             livingentity = (LivingEntity)p_34288_.m_7639_();
+          }
+ 
+-         if (livingentity != null && this.f_19853_.m_46791_() == Difficulty.HARD && (double)this.f_19796_.nextFloat() < this.m_21133_(Attributes.f_22287_) && this.f_19853_.m_46469_().m_46207_(GameRules.f_46134_)) {
+             int i = Mth.m_14107_(this.m_20185_());
+             int j = Mth.m_14107_(this.m_20186_());
+             int k = Mth.m_14107_(this.m_20189_());
+-            Zombie zombie = new Zombie(this.f_19853_);
++         net.minecraftforge.event.entity.living.ZombieEvent.SummonAidEvent event = net.minecraftforge.event.ForgeEventFactory.fireZombieSummonAid(this, f_19853_, i, j, k, livingentity, this.m_21051_(Attributes.f_22287_).m_22135_());
++         if (event.getResult() == net.minecraftforge.eventbus.api.Event.Result.DENY) return true;
++         if (event.getResult() == net.minecraftforge.eventbus.api.Event.Result.ALLOW  ||
++            livingentity != null && this.f_19853_.m_46791_() == Difficulty.HARD && (double)this.f_19796_.nextFloat() < this.m_21051_(Attributes.f_22287_).m_22135_() && this.f_19853_.m_46469_().m_46207_(GameRules.f_46134_)) {
++            Zombie zombie = event.getCustomSummonedAid() != null && event.getResult() == net.minecraftforge.eventbus.api.Event.Result.ALLOW ? event.getCustomSummonedAid() : EntityType.f_20501_.m_20615_(this.f_19853_);
+ 
+             for(int l = 0; l < 50; ++l) {
+                int i1 = i + Mth.m_14072_(this.f_19796_, 7, 40) * Mth.m_14072_(this.f_19796_, -1, 1);
+@@ -288,6 +_,7 @@
+                if (NaturalSpawner.m_47051_(spawnplacements$type, this.f_19853_, blockpos, entitytype) && SpawnPlacements.m_21759_(entitytype, serverlevel, MobSpawnType.REINFORCEMENT, blockpos, this.f_19853_.f_46441_)) {
+                   zombie.m_6034_((double)i1, (double)j1, (double)k1);
+                   if (!this.f_19853_.m_45914_((double)i1, (double)j1, (double)k1, 7.0D) && this.f_19853_.m_45784_(zombie) && this.f_19853_.m_45786_(zombie) && !this.f_19853_.m_46855_(zombie.m_142469_())) {
++                     if (livingentity != null)
+                      zombie.m_6710_(livingentity);
+                      zombie.m_6518_(serverlevel, this.f_19853_.m_6436_(zombie.m_142538_()), MobSpawnType.REINFORCEMENT, (SpawnGroupData)null, (CompoundTag)null);
+                      serverlevel.m_47205_(zombie);
+@@ -373,7 +_,7 @@
+ 
+    public void m_5837_(ServerLevel p_34281_, LivingEntity p_34282_) {
+       super.m_5837_(p_34281_, p_34282_);
+-      if ((p_34281_.m_46791_() == Difficulty.NORMAL || p_34281_.m_46791_() == Difficulty.HARD) && p_34282_ instanceof Villager) {
++      if ((p_34281_.m_46791_() == Difficulty.NORMAL || p_34281_.m_46791_() == Difficulty.HARD) && p_34282_ instanceof Villager && net.minecraftforge.event.ForgeEventFactory.canLivingConvert(p_34282_, EntityType.f_20530_, (timer) -> {})) {
+          if (p_34281_.m_46791_() != Difficulty.HARD && this.f_19796_.nextBoolean()) {
+             return;
+          }
+@@ -384,6 +_,7 @@
+          zombievillager.m_141967_(villager.m_7141_());
+          zombievillager.m_34411_(villager.m_6616_().m_45388_());
+          zombievillager.m_34373_(villager.m_7809_());
++         net.minecraftforge.event.ForgeEventFactory.onLivingConvert(p_34282_, zombievillager);
+          if (!this.m_20067_()) {
+             p_34281_.m_5898_((Player)null, 1026, this.m_142538_(), 0);
+          }
+@@ -459,7 +_,7 @@
+    }
+ 
+    public static boolean m_34302_(Random p_34303_) {
+-      return p_34303_.nextFloat() < 0.05F;
++      return p_34303_.nextFloat() < net.minecraftforge.common.ForgeConfig.SERVER.zombieBabyChance.get();
+    }
+ 
+    protected void m_34339_(float p_34340_) {
+@@ -479,7 +_,7 @@
+    }
+ 
+    protected void m_7572_() {
+-      this.m_21051_(Attributes.f_22287_).m_22100_(this.f_19796_.nextDouble() * (double)0.1F);
++      this.m_21051_(Attributes.f_22287_).m_22100_(this.f_19796_.nextDouble() * net.minecraftforge.common.ForgeConfig.SERVER.zombieBaseSummonChance.get());
+    }
+ 
+    public double m_6049_() {

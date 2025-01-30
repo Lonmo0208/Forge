@@ -1,19 +1,18 @@
 /*
- * Copyright (c) Forge Development LLC and contributors
+ * Minecraft Forge - Forge Development LLC
  * SPDX-License-Identifier: LGPL-2.1-only
  */
 
 package net.minecraftforge.event.entity.player;
 
 import net.minecraftforge.eventbus.api.Cancelable;
-import net.minecraftforge.eventbus.api.Event.HasResult;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.Level;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
+
+import javax.annotation.Nonnull;
 
 /**
  * This event is called when a player attempts to use Bonemeal on a block.
@@ -25,36 +24,42 @@ import org.jetbrains.annotations.Nullable;
  * setResult(ALLOW) is the same as the old setHandled()
  */
 @Cancelable
-@HasResult
-// TODO: Redesign BonemealEvent the whole thing, it doens't make sense.
-public class BonemealEvent extends PlayerEvent {
-    private final Level level;
+@net.minecraftforge.eventbus.api.Event.HasResult
+public class BonemealEvent extends PlayerEvent
+{
+
+    private final Level world;
     private final BlockPos pos;
     private final BlockState block;
     private final ItemStack stack;
 
-    public BonemealEvent(@Nullable Player player, Level level, BlockPos pos, BlockState block, ItemStack stack) {
+    public BonemealEvent(@Nonnull Player player, @Nonnull Level world, @Nonnull BlockPos pos, @Nonnull BlockState block, @Nonnull ItemStack stack)
+    {
         super(player);
-        this.level = level;
+        this.world = world;
         this.pos = pos;
         this.block = block;
         this.stack = stack;
     }
 
-    public Level getLevel() {
-        return level;
+    public Level getWorld()
+    {
+        return world;
     }
 
-    public BlockPos getPos() {
+    public BlockPos getPos()
+    {
         return pos;
     }
 
-    public BlockState getBlock() {
+    public BlockState getBlock()
+    {
         return block;
     }
 
-    @NotNull
-    public ItemStack getStack() {
+    @Nonnull
+    public ItemStack getStack()
+    {
         return stack;
     }
 }

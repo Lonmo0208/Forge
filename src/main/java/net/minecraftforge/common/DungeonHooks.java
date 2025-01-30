@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Forge Development LLC and contributors
+ * Minecraft Forge - Forge Development LLC
  * SPDX-License-Identifier: LGPL-2.1-only
  */
 
@@ -9,7 +9,6 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.Random;
 
-import net.minecraft.util.RandomSource;
 import net.minecraft.util.random.WeightedEntry;
 import net.minecraft.util.random.WeightedRandom;
 import net.minecraft.world.entity.EntityType;
@@ -79,7 +78,7 @@ public class DungeonHooks
      * @param rand World generation random number generator
      * @return The mob name
      */
-    public static EntityType<?> getRandomDungeonMob(RandomSource rand)
+    public static EntityType<?> getRandomDungeonMob(Random rand)
     {
         DungeonMob mob = WeightedRandom.getRandomItem(rand, dungeonMobs).orElseThrow();
         return mob.type;

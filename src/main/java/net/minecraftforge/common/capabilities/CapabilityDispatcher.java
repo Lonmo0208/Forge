@@ -1,26 +1,26 @@
 /*
- * Copyright (c) Forge Development LLC and contributors
+ * Minecraft Forge - Forge Development LLC
  * SPDX-License-Identifier: LGPL-2.1-only
  */
 
 package net.minecraftforge.common.capabilities;
 
+import javax.annotation.Nullable;
 import javax.annotation.ParametersAreNonnullByDefault;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+
+import com.google.common.collect.Lists;
 
 import net.minecraft.MethodsReturnNonnullByDefault;
 import net.minecraft.nbt.Tag;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.core.Direction;
-import net.minecraft.core.HolderLookup;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraftforge.common.util.INBTSerializable;
 import net.minecraftforge.common.util.LazyOptional;
-import org.jetbrains.annotations.Nullable;
 
 /**
  * A high-speed implementation of a capability delegator.
@@ -34,36 +34,42 @@ import org.jetbrains.annotations.Nullable;
  */
 @ParametersAreNonnullByDefault
 @MethodsReturnNonnullByDefault
-@SuppressWarnings("deprecation")
-public final class CapabilityDispatcher implements INBTSerializable<CompoundTag>, ICapabilityProvider {
-    private final ICapabilityProvider[] caps;
-    private final INBTSerializable<Tag>[] writers;
-    private final String[] names;
+public final class CapabilityDispatcher implements INBTSerializable<CompoundTag>, ICapabilityProvider
+{
+    private ICapabilityProvider[] caps;
+    private INBTSerializable<Tag>[] writers;
+    private String[] names;
     private final List<Runnable> listeners;
 
-    public CapabilityDispatcher(Map<ResourceLocation, ICapabilityProvider> list, List<Runnable> listeners) {
+    public CapabilityDispatcher(Map<ResourceLocation, ICapabilityProvider> list, List<Runnable> listeners)
+    {
         this(list, listeners, null);
     }
 
     @SuppressWarnings("unchecked")
-    public CapabilityDispatcher(Map<ResourceLocation, ICapabilityProvider> list, List<Runnable> listeners, @Nullable ICapabilityProvider parent) {
-        List<ICapabilityProvider> lstCaps = new ArrayList<>();
-        List<INBTSerializable<Tag>> lstWriters = new ArrayList<>();
-        List<String> lstNames = new ArrayList<>();
+    public CapabilityDispatcher(Map<ResourceLocation, ICapabilityProvider> list, List<Runnable> listeners, @Nullable ICapabilityProvider parent)
+    {
+        List<ICapabilityProvider> lstCaps = Lists.newArrayList();
+        List<INBTSerializable<Tag>> lstWriters = Lists.newArrayList();
+        List<String> lstNames = Lists.newArrayList();
         this.listeners = listeners;
 
-        if (parent != null) { // Parents go first!
+        if (parent != null) // Parents go first!
+        {
             lstCaps.add(parent);
-            if (parent instanceof INBTSerializable) {
+            if (parent instanceof INBTSerializable)
+            {
                 lstWriters.add((INBTSerializable<Tag>)parent);
                 lstNames.add("Parent");
             }
         }
 
-        for (var entry : list.entrySet()) {
+        for (Map.Entry<ResourceLocation, ICapabilityProvider> entry : list.entrySet())
+        {
             ICapabilityProvider prov = entry.getValue();
             lstCaps.add(prov);
-            if (prov instanceof INBTSerializable) {
+            if (prov instanceof INBTSerializable)
+            {
                 lstWriters.add((INBTSerializable<Tag>)prov);
                 lstNames.add(entry.getKey().toString());
             }
@@ -76,11 +82,14 @@ public final class CapabilityDispatcher implements INBTSerializable<CompoundTag>
 
 
     @Override
-    public <T> LazyOptional<T> getCapability(Capability<T> cap, @Nullable Direction side) {
-        for (ICapabilityProvider c : caps) {
+    public <T> LazyOptional<T> getCapability(Capability<T> cap, @Nullable Direction side)
+    {
+        for (ICapabilityProvider c : caps)
+        {
             LazyOptional<T> ret = c.getCapability(cap, side);
             //noinspection ConstantConditions
-            if (ret == null) {
+            if (ret == null)
+            {
                 throw new RuntimeException(
                         String.format(
                                 Locale.ENGLISH,
@@ -89,31 +98,46 @@ public final class CapabilityDispatcher implements INBTSerializable<CompoundTag>
                         )
                 );
             }
-
             if (ret.isPresent())
+            {
                 return ret;
+            }
         }
-
         return LazyOptional.empty();
     }
 
     @Override
-    public CompoundTag serializeNBT(HolderLookup.Provider registryAccess) {
+    public CompoundTag serializeNBT()
+    {
         CompoundTag nbt = new CompoundTag();
         for (int x = 0; x < writers.length; x++)
-            nbt.put(names[x], writers[x].serializeNBT(registryAccess));
+        {
+            nbt.put(names[x], writers[x].serializeNBT());
+        }
         return nbt;
     }
 
     @Override
-    public void deserializeNBT(HolderLookup.Provider registryAccess, CompoundTag nbt) {
-        for (int x = 0; x < writers.length; x++) {
+    public void deserializeNBT(CompoundTag nbt)
+    {
+        for (int x = 0; x < writers.length; x++)
+        {
             if (nbt.contains(names[x]))
-                writers[x].deserializeNBT(registryAccess, nbt.get(names[x]));
+            {
+                writers[x].deserializeNBT(nbt.get(names[x]));
+            }
         }
     }
 
-    public void invalidate() {
+    public boolean areCompatible(@Nullable CapabilityDispatcher other) //Called from ItemStack to compare equality.
+    {                                                        // Only compares serializeable caps.
+        if (other == null) return this.writers.length == 0;  // Done this way so we can do some pre-checks before doing the costly NBT serialization and compare
+        if (this.writers.length == 0) return other.writers.length == 0;
+        return this.serializeNBT().equals(other.serializeNBT());
+    }
+
+    public void invalidate()
+    {
         this.listeners.forEach(Runnable::run);
     }
 }

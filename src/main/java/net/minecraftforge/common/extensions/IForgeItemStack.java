@@ -1,14 +1,18 @@
 /*
- * Copyright (c) Forge Development LLC and contributors
+ * Minecraft Forge - Forge Development LLC
  * SPDX-License-Identifier: LGPL-2.1-only
  */
 
 package net.minecraftforge.common.extensions;
 
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
+
+import net.minecraft.core.Registry;
 import net.minecraft.world.damagesource.DamageSource;
-import net.minecraft.world.entity.monster.Monster;
-import net.minecraft.world.entity.player.Inventory;
+import net.minecraft.world.entity.monster.EnderMan;
 import net.minecraft.world.item.crafting.RecipeType;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.pattern.BlockInWorld;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.item.enchantment.Enchantment;
@@ -21,34 +25,46 @@ import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.context.UseOnContext;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.stats.Stats;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.Holder;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.level.Level;
 import net.minecraftforge.common.ToolAction;
 import net.minecraftforge.common.ToolActions;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
+import net.minecraftforge.common.capabilities.ICapabilitySerializable;
 
 /*
  * Extension added to ItemStack that bounces to ItemSack sensitive Item methods. Typically this is just for convince.
  */
-public interface IForgeItemStack {
+public interface IForgeItemStack extends ICapabilitySerializable<CompoundTag>
+{
     // Helpers for accessing Item data
-    private ItemStack self() {
+    private ItemStack self()
+    {
         return (ItemStack)this;
     }
 
     /**
-     * ItemStack sensitive version of {@link Item#getCraftingRemainder()}.
-     * Returns a full ItemStack instance of the result.
+     * ItemStack sensitive version of getContainerItem. Returns a full ItemStack
+     * instance of the result.
      *
      * @return The resulting ItemStack
      */
-    default ItemStack getCraftingRemainder() {
-        return self().getItem().getCraftingRemainder(self());
+    default ItemStack getContainerItem()
+    {
+        return self().getItem().getContainerItem(self());
+    }
+
+    /**
+     * ItemStack sensitive version of hasContainerItem
+     *
+     * @return True if this item has a 'container'
+     */
+    default boolean hasContainerItem()
+    {
+        return self().getItem().hasContainerItem(self());
     }
 
     /**
@@ -56,16 +72,18 @@ public interface IForgeItemStack {
      *         it not act as a fuel. Return -1 to let the default vanilla logic
      *         decide.
      */
-    default int getBurnTime(@Nullable RecipeType<?> recipeType) {
+    default int getBurnTime(@Nullable RecipeType<?> recipeType)
+    {
         return self().getItem().getBurnTime(self(), recipeType);
     }
 
-    default InteractionResult onItemUseFirst(UseOnContext context) {
+    default InteractionResult onItemUseFirst(UseOnContext context)
+    {
        Player entityplayer = context.getPlayer();
        BlockPos blockpos = context.getClickedPos();
        BlockInWorld blockworldstate = new BlockInWorld(context.getLevel(), blockpos, false);
-       var adventure = (self().canBreakBlockInAdventureMode(blockworldstate) || self().canPlaceOnBlockInAdventureMode(blockworldstate));
-       if (entityplayer != null && !entityplayer.getAbilities().mayBuild && !adventure) {
+       Registry<Block> registry = entityplayer.level.registryAccess().registryOrThrow(Registry.BLOCK_REGISTRY);
+       if (entityplayer != null && !entityplayer.getAbilities().mayBuild && !self().hasAdventureModePlaceTagForBlock(registry, blockworldstate)) {
           return InteractionResult.PASS;
        } else {
           Item item = self().getItem();
@@ -78,13 +96,21 @@ public interface IForgeItemStack {
        }
     }
 
+    default CompoundTag serializeNBT()
+    {
+        CompoundTag ret = new CompoundTag();
+        self().save(ret);
+        return ret;
+    }
+
     /**
      * Queries if an item can perform the given action.
      * See {@link ToolActions} for a description of each stock action
      * @param toolAction The action being queried
      * @return True if the stack can perform the action
      */
-    default boolean canPerformAction(ToolAction toolAction) {
+    default boolean canPerformAction(ToolAction toolAction)
+    {
         return self().getItem().canPerformAction(self(), toolAction);
     }
 
@@ -98,7 +124,8 @@ public interface IForgeItemStack {
      * @param player    The Player that is wielding the item
      * @return True to prevent harvesting, false to continue as normal
      */
-    default boolean onBlockStartBreak(BlockPos pos, Player player) {
+    default boolean onBlockStartBreak(BlockPos pos, Player player)
+    {
         return !self().isEmpty() && self().getItem().onBlockStartBreak(self(), pos, player);
     }
 
@@ -109,7 +136,8 @@ public interface IForgeItemStack {
      * @param newStack The new stack
      * @return True to reset block break progress
      */
-    default boolean shouldCauseBlockBreakReset(ItemStack newStack) {
+    default boolean shouldCauseBlockBreakReset(ItemStack newStack)
+    {
         return self().getItem().shouldCauseBlockBreakReset(self(), newStack);
     }
 
@@ -124,30 +152,21 @@ public interface IForgeItemStack {
      *
      * @param enchantment the enchantment to be applied
      * @return true if the enchantment can be applied to this item
-     *
-     * @deprecated Use {@link #canApplyAtEnchantingTable(Holder)}
      */
-    @Deprecated(forRemoval = true, since = "1.21.3")
-    default boolean canApplyAtEnchantingTable(Enchantment enchantment) {
+    default boolean canApplyAtEnchantingTable(Enchantment enchantment)
+    {
         return self().getItem().canApplyAtEnchantingTable(self(), enchantment);
     }
 
     /**
-     * Checks whether an item can be enchanted with a certain enchantment. This
-     * applies specifically to enchanting an item in the enchanting table and is
-     * called when retrieving the list of possible enchantments for an item.
-     * Enchantments may additionally (or exclusively) be doing their own checks in
-     * {@link Enchantment#canApplyAtEnchantingTable(ItemStack)};
-     * check the individual implementation for reference. By default this will check
-     * if the enchantment type is valid for this item type.
+     * ItemStack sensitive version of getItemEnchantability
      *
-     * @param enchantment the enchantment to be applied
-     * @return true if the enchantment can be applied to this item
+     * @return the item echantability value
      */
-    default boolean canApplyAtEnchantingTable(Holder<Enchantment> enchantment) {
-        return self().getItem().canApplyAtEnchantingTable(self(), enchantment);
+    default int getItemEnchantability()
+    {
+        return self().getItem().getItemEnchantability(self());
     }
-
 
     /**
      * Override this to set a non-default armor slot for an ItemStack, but <em>do
@@ -159,7 +178,8 @@ public interface IForgeItemStack {
      *         decide
      */
     @Nullable
-    default EquipmentSlot getEquipmentSlot() {
+    default EquipmentSlot getEquipmentSlot()
+    {
         return self().getItem().getEquipmentSlot(self());
     }
 
@@ -171,7 +191,8 @@ public interface IForgeItemStack {
      * @param attacker The LivingEntity holding the ItemStack
      * @return True if this ItemStack can disable the shield in question.
      */
-    default boolean canDisableShield(ItemStack shield, LivingEntity entity, LivingEntity attacker) {
+    default boolean canDisableShield(ItemStack shield, LivingEntity entity, LivingEntity attacker)
+    {
         return self().getItem().canDisableShield(self(), shield, entity, attacker);
     }
 
@@ -181,18 +202,21 @@ public interface IForgeItemStack {
      * @param entity The entity swinging the item.
      * @return True to cancel any further processing by EntityLiving
      */
-    default boolean onEntitySwing(LivingEntity entity) {
+    default boolean onEntitySwing(LivingEntity entity)
+    {
         return self().getItem().onEntitySwing(self(), entity);
     }
 
     /**
-     * Called when an entity stops using an item item for any reason.
+     * Called each tick while using an item.
      *
-     * @param entity The entity using the item, typically a player
-     * @param count  The amount of time in tick the item has been used for continuously
+     * @param player The Player using the item
+     * @param count  The amount of time in tick the item has been used for
+     *               continuously
      */
-    default void onStopUsing(LivingEntity entity, int count) {
-        self().getItem().onStopUsing(self(), entity, count);
+    default void onUsingTick(LivingEntity player, int count)
+    {
+        self().getItem().onUsingTick(self(), player, count);
     }
 
     /**
@@ -202,7 +226,8 @@ public interface IForgeItemStack {
      * @param level     The level the entity is in
      * @return The normal lifespan in ticks.
      */
-    default int getEntityLifespan(Level level) {
+    default int getEntityLifespan(Level level)
+    {
         return self().getItem().getEntityLifespan(self(), level);
     }
 
@@ -214,17 +239,27 @@ public interface IForgeItemStack {
      * @param entity The entity Item
      * @return Return true to skip any further update code.
      */
-    default boolean onEntityItemUpdate(ItemEntity entity) {
+    default boolean onEntityItemUpdate(ItemEntity entity)
+    {
         return self().getItem().onEntityItemUpdate(self(), entity);
     }
 
     /**
-     * Called to tick this items in a players inventory, the indexes are the global slot index.
-     */
-    default void onInventoryTick(Level level, Player player, int slotIndex, int selectedIndex) {
-        self().getItem().onInventoryTick(self(), level, player, slotIndex, selectedIndex);
+    * Determines the amount of durability the mending enchantment
+    * will repair, on average, per point of experience.
+    */
+    default float getXpRepairRatio()
+    {
+        return self().getItem().getXpRepairRatio(self());
     }
 
+    /**
+     * Called to tick armor in the armor slot. Override to do something
+     */
+    default void onArmorTick(Level level, Player player)
+    {
+        self().getItem().onArmorTick(self(), level, player);
+    }
 
     /**
      * Called every tick from {@code Horse#playGallopSound(SoundEvent)} on the item in the
@@ -233,7 +268,8 @@ public interface IForgeItemStack {
      * @param level the level the horse is in
      * @param horse the horse wearing this armor
      */
-    default void onHorseArmorTick(Level level, Mob horse) {
+    default void onHorseArmorTick(Level level, Mob horse)
+    {
         self().getItem().onHorseArmorTick(self(), level, horse);
     }
 
@@ -245,7 +281,8 @@ public interface IForgeItemStack {
      * @param entity    The entity trying to equip the armor
      * @return True if the given ItemStack can be inserted in the slot
      */
-    default boolean canEquip(EquipmentSlot armorType, Entity entity) {
+    default boolean canEquip(EquipmentSlot armorType, Entity entity)
+    {
         return self().getItem().canEquip(self(), armorType, entity);
     }
 
@@ -255,7 +292,8 @@ public interface IForgeItemStack {
      * @param book  The book
      * @return if the enchantment is allowed
      */
-    default boolean isBookEnchantable(ItemStack book) {
+    default boolean isBookEnchantable(ItemStack book)
+    {
         return self().getItem().isBookEnchantable(self(), book);
     }
 
@@ -267,7 +305,8 @@ public interface IForgeItemStack {
      *
      * @param player The player that dropped the item
      */
-    default boolean onDroppedByPlayer(Player player) {
+    default boolean onDroppedByPlayer(Player player)
+    {
         return self().getItem().onDroppedByPlayer(self(), player);
     }
 
@@ -279,8 +318,39 @@ public interface IForgeItemStack {
      * @param displayName the name that will be displayed unless it is changed in
      *                    this method.
      */
-    default Component getHighlightTip(Component displayName) {
+    default Component getHighlightTip(Component displayName)
+    {
         return self().getItem().getHighlightTip(self(), displayName);
+    }
+
+    /**
+     * Get the NBT data to be sent to the client. The Item can control what data is kept in the tag.
+     *
+     * Note that this will sometimes be applied multiple times, the following MUST
+     * be supported:
+     *   Item item = stack.getItem();
+     *   NBTTagCompound nbtShare1 = item.getNBTShareTag(stack);
+     *   stack.setTagCompound(nbtShare1);
+     *   NBTTagCompound nbtShare2 = item.getNBTShareTag(stack);
+     *   assert nbtShare1.equals(nbtShare2);
+     *
+     * @return The NBT tag
+     */
+    @Nullable
+    default CompoundTag getShareTag()
+    {
+        return self().getItem().getShareTag(self());
+    }
+
+    /**
+     * Override this method to decide what to do with the NBT data received from
+     * getNBTShareTag().
+     *
+     * @param nbt   Received NBT, can be null
+     */
+    default void readShareTag(@Nullable CompoundTag nbt)
+    {
+        self().getItem().readShareTag(self(), nbt);
     }
 
     /**
@@ -291,8 +361,50 @@ public interface IForgeItemStack {
      * @param pos Block position in level
      * @param player The Player that is wielding the item
      */
-    default boolean doesSneakBypassUse(net.minecraft.world.level.LevelReader level, BlockPos pos, Player player) {
+    default boolean doesSneakBypassUse(net.minecraft.world.level.LevelReader level, BlockPos pos, Player player)
+    {
         return self().isEmpty() || self().getItem().doesSneakBypassUse(self(), level, pos, player);
+    }
+
+    /**
+     * Modeled after ItemStack.areItemStackTagsEqual
+     * Uses Item.getNBTShareTag for comparison instead of NBT and capabilities.
+     * Only used for comparing itemStacks that were transferred from server to client using Item.getNBTShareTag.
+     */
+    default boolean areShareTagsEqual(ItemStack other)
+    {
+        CompoundTag shareTagA = self().getShareTag();
+        CompoundTag shareTagB = other.getShareTag();
+        if (shareTagA == null)
+            return shareTagB == null;
+        else
+            return shareTagB != null && shareTagA.equals(shareTagB);
+    }
+
+    /**
+     * Determines if the ItemStack is equal to the other item stack, including Item, Count, and NBT.
+     *
+     * @param other The other stack
+     * @param limitTags True to use shareTag False to use full NBT tag
+     * @return true if equals
+     */
+    default boolean equals(ItemStack other, boolean limitTags)
+    {
+        if (self().isEmpty())
+            return other.isEmpty();
+        else
+            return !other.isEmpty() && self().getCount() == other.getCount() && self().getItem() == other.getItem() &&
+            (limitTags ? self().areShareTagsEqual(other) : ItemStack.tagMatches(self(), other));
+    }
+
+    /**
+     * Determines if a item is reparable, used by Repair recipes and Grindstone.
+     *
+     * @return True if reparable
+     */
+    default boolean isRepairable()
+    {
+        return self().getItem().isRepairable(self());
     }
 
     /**
@@ -300,7 +412,8 @@ public interface IForgeItemStack {
      *
      * @return True if this item can be used as "currency" by piglins
      */
-    default boolean isPiglinCurrency() {
+    default boolean isPiglinCurrency()
+    {
         return self().getItem().isPiglinCurrency(self());
     }
 
@@ -312,19 +425,21 @@ public interface IForgeItemStack {
      *
      * @return True if piglins are neutral to players wearing this item in an armor slot
      */
-    default boolean makesPiglinsNeutral(LivingEntity wearer) {
+    default boolean makesPiglinsNeutral(LivingEntity wearer)
+    {
         return self().getItem().makesPiglinsNeutral(self(), wearer);
     }
 
     /**
-     * Whether this Item can be used to hide player from enderman/Creaking.
+     * Whether this Item can be used to hide player head for enderman.
      *
      * @param player The player watching the enderman
-     * @param monster The monster you're trying to hide from
+     * @param endermanEntity The enderman that the player look
      * @return true if this Item can be used.
      */
-    default boolean isMonsterDisguise(Player player, Monster monster) {
-        return self().getItem().isMonsterDisguise(self(), player, monster);
+    default boolean isEnderMask(Player player, EnderMan endermanEntity)
+    {
+        return self().getItem().isEnderMask(self(), player, endermanEntity);
     }
 
     /**
@@ -334,7 +449,8 @@ public interface IForgeItemStack {
      * @param entity The entity trying to fly.
      * @return True if the entity can use Elytra flight.
      */
-    default boolean canElytraFly(LivingEntity entity) {
+    default boolean canElytraFly(LivingEntity entity)
+    {
         return self().getItem().canElytraFly(self(), entity);
     }
 
@@ -349,7 +465,8 @@ public interface IForgeItemStack {
      * @param flightTicks The number of ticks the entity has been Elytra flying for.
      * @return True if the entity should continue Elytra flight or False to stop.
      */
-    default boolean elytraFlightTick(LivingEntity entity, int flightTicks) {
+    default boolean elytraFlightTick(LivingEntity entity, int flightTicks)
+    {
         return self().getItem().elytraFlightTick(self(), entity, flightTicks);
     }
 
@@ -361,19 +478,21 @@ public interface IForgeItemStack {
      *
      * @return True if the entity can walk on powdered snow
      */
-    default boolean canWalkOnPowderedSnow(LivingEntity wearer) {
+    default boolean canWalkOnPowderedSnow(LivingEntity wearer)
+    {
         return self().getItem().canWalkOnPowderedSnow(self(), wearer);
     }
-
+    
     /**
      * Get a bounding box ({@link AABB}) of a sweep attack.
-     *
+     * 
      * @param player the performing the attack the attack.
      * @param target the entity targeted by the attack.
      * @return the bounding box.
      */
-    @NotNull
-    default AABB getSweepHitBox(@NotNull Player player, @NotNull Entity target) {
+    @Nonnull
+    default AABB getSweepHitBox(@Nonnull Player player, @Nonnull Entity target)
+    {
         return self().getItem().getSweepHitBox(self(), player, target);
     }
 
@@ -383,27 +502,8 @@ public interface IForgeItemStack {
      * @param itemEntity   The item entity that was destroyed.
      * @param damageSource Damage source that caused the item entity to "die".
      */
-    default void onDestroyed(ItemEntity itemEntity, DamageSource damageSource) {
+    default void onDestroyed(ItemEntity itemEntity, DamageSource damageSource)
+    {
         self().getItem().onDestroyed(itemEntity, damageSource);
-    }
-
-    /**
-     * Whether this stack should be excluded (if possible) when selecting the target hotbar slot of a "pick" action.
-     * By default, this returns true for enchanted stacks.
-     *
-     * @see Inventory#getSuitableHotbarSlot()
-     * @param player the player performing the picking
-     * @param inventorySlot the inventory slot of the item being up for replacement
-     * @return true to leave this stack in the hotbar if possible
-     */
-    default boolean isNotReplaceableByPickAction(Player player, int inventorySlot) {
-        return self().getItem().isNotReplaceableByPickAction(self(), player, inventorySlot);
-    }
-
-    /**
-     * {@return true if the given ItemStack can be put into a grindstone to be repaired and/or stripped of its enchantments}
-     */
-    default boolean canGrindstoneRepair() {
-        return self().getItem().canGrindstoneRepair(self());
     }
 }

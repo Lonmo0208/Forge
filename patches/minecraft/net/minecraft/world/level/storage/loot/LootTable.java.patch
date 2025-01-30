@@ -1,131 +1,103 @@
 --- a/net/minecraft/world/level/storage/loot/LootTable.java
 +++ b/net/minecraft/world/level/storage/loot/LootTable.java
-@@ -38,7 +_,7 @@
-         p_327557_ -> p_327557_.group(
-                     LootContextParamSets.CODEC.lenientOptionalFieldOf("type", DEFAULT_PARAM_SET).forGetter(p_297013_ -> p_297013_.paramSet),
-                     ResourceLocation.CODEC.optionalFieldOf("random_sequence").forGetter(p_297014_ -> p_297014_.randomSequence),
--                    LootPool.CODEC.listOf().optionalFieldOf("pools", List.of()).forGetter(p_297012_ -> p_297012_.pools),
-+                    LootPool.CONDITIONAL_CODEC.listOf().optionalFieldOf("pools", List.of()).forGetter(p_297012_ -> p_297012_.pools),
-                     LootItemFunctions.ROOT_CODEC.listOf().optionalFieldOf("functions", List.of()).forGetter(p_297010_ -> p_297010_.functions)
-                 )
-                 .apply(p_327557_, LootTable::new)
-@@ -53,7 +_,7 @@
-     LootTable(ContextKeySet p_365565_, Optional<ResourceLocation> p_298628_, List<LootPool> p_298771_, List<LootItemFunction> p_301234_) {
-         this.paramSet = p_365565_;
-         this.randomSequence = p_298628_;
--        this.pools = p_298771_;
-+        this.pools = Lists.newArrayList(p_298771_);
-         this.functions = p_301234_;
-         this.compositeFunction = LootItemFunctions.compose(p_301234_);
-     }
-@@ -76,10 +_,12 @@
-         };
-     }
+@@ -34,13 +_,13 @@
+    public static final LootTable f_79105_ = new LootTable(LootContextParamSets.f_81410_, new LootPool[0], new LootItemFunction[0]);
+    public static final LootContextParamSet f_79106_ = LootContextParamSets.f_81420_;
+    final LootContextParamSet f_79108_;
+-   final LootPool[] f_79109_;
++   private final List<LootPool> f_79109_;
+    final LootItemFunction[] f_79110_;
+    private final BiFunction<ItemStack, LootContext, ItemStack> f_79111_;
  
-+    @Deprecated // Use a non-'Raw' version of 'getRandomItems', so that the Forge Global Loot Modifiers will be applied
-     public void getRandomItemsRaw(LootParams p_287669_, Consumer<ItemStack> p_287781_) {
-         this.getRandomItemsRaw(new LootContext.Builder(p_287669_).create(this.randomSequence), p_287781_);
-     }
+    LootTable(LootContextParamSet p_79114_, LootPool[] p_79115_, LootItemFunction[] p_79116_) {
+       this.f_79108_ = p_79114_;
+-      this.f_79109_ = p_79115_;
++      this.f_79109_ = Lists.newArrayList(p_79115_);
+       this.f_79110_ = p_79116_;
+       this.f_79111_ = LootItemFunctions.m_80770_(p_79116_);
+    }
+@@ -78,6 +_,7 @@
  
-+    @Deprecated // Use a non-'Raw' version of 'getRandomItems', so that the Forge Global Loot Modifiers will be applied
-     public void getRandomItemsRaw(LootContext p_79132_, Consumer<ItemStack> p_79133_) {
-         LootContext.VisitedEntry<?> visitedentry = LootContext.createVisitedEntry(this);
-         if (p_79132_.pushVisitedElement(visitedentry)) {
-@@ -96,15 +_,15 @@
-     }
+    }
  
-     public void getRandomItems(LootParams p_287748_, long p_287729_, Consumer<ItemStack> p_287583_) {
--        this.getRandomItemsRaw(new LootContext.Builder(p_287748_).withOptionalRandomSeed(p_287729_).create(this.randomSequence), createStackSplitter(p_287748_.getLevel(), p_287583_));
-+        this.getRandomItems(new LootContext.Builder(p_287748_).withOptionalRandomSeed(p_287729_).create(this.randomSequence)).forEach(p_287583_);
-     }
++   @Deprecated //Use other method or manually call ForgeHooks.modifyLoot
+    public void m_79148_(LootContext p_79149_, Consumer<ItemStack> p_79150_) {
+       this.m_79131_(p_79149_, m_79142_(p_79150_));
+    }
+@@ -85,6 +_,7 @@
+    public List<ItemStack> m_79129_(LootContext p_79130_) {
+       List<ItemStack> list = Lists.newArrayList();
+       this.m_79148_(p_79130_, list::add);
++      list = net.minecraftforge.common.ForgeHooks.modifyLoot(this.getLootTableId(), list, p_79130_);
+       return list;
+    }
  
-     public void getRandomItems(LootParams p_287704_, Consumer<ItemStack> p_287617_) {
--        this.getRandomItemsRaw(p_287704_, createStackSplitter(p_287704_.getLevel(), p_287617_));
-+        this.getRandomItems(p_287704_).forEach(p_287617_);
-     }
+@@ -93,8 +_,8 @@
+    }
  
-     public void getRandomItems(LootContext p_79149_, Consumer<ItemStack> p_79150_) {
--        this.getRandomItemsRaw(p_79149_, createStackSplitter(p_79149_.getLevel(), p_79150_));
-+        this.getRandomItems(p_79149_).forEach(p_79150_);
-     }
+    public void m_79136_(ValidationContext p_79137_) {
+-      for(int i = 0; i < this.f_79109_.length; ++i) {
+-         this.f_79109_[i].m_79051_(p_79137_.m_79365_(".pools[" + i + "]"));
++      for(int i = 0; i < this.f_79109_.size(); ++i) {
++         this.f_79109_.get(i).m_79051_(p_79137_.m_79365_(".pools[" + i + "]"));
+       }
  
-     public ObjectArrayList<ItemStack> getRandomItems(LootParams p_345012_, RandomSource p_344559_) {
-@@ -121,7 +_,8 @@
+       for(int j = 0; j < this.f_79110_.length; ++j) {
+@@ -176,6 +_,48 @@
+       return new LootTable.Builder();
+    }
  
-     private ObjectArrayList<ItemStack> getRandomItems(LootContext p_230923_) {
-         ObjectArrayList<ItemStack> objectarraylist = new ObjectArrayList<>();
--        this.getRandomItems(p_230923_, objectarraylist::add);
-+        this.getRandomItemsRaw(p_230923_, createStackSplitter(p_230923_.getLevel(), objectarraylist::add));
-+        objectarraylist = net.minecraftforge.common.ForgeHooks.modifyLoot(this, objectarraylist, p_230923_);
-         return objectarraylist;
-     }
++   //======================== FORGE START =============================================
++   private boolean isFrozen = false;
++   public void freeze() {
++      this.isFrozen = true;
++      this.f_79109_.forEach(LootPool::freeze);
++   }
++   public boolean isFrozen(){ return this.isFrozen; }
++   private void checkFrozen() {
++      if (this.isFrozen())
++         throw new RuntimeException("Attempted to modify LootTable after being finalized!");
++   }
++
++   private ResourceLocation lootTableId;
++   public void setLootTableId(final ResourceLocation id) {
++      if (this.lootTableId != null) throw new IllegalStateException("Attempted to rename loot table from '" + this.lootTableId + "' to '" + id + "': this is not supported");
++      this.lootTableId = java.util.Objects.requireNonNull(id);
++   }
++   public ResourceLocation getLootTableId() { return this.lootTableId; }
++
++   public LootPool getPool(String name) {
++      return f_79109_.stream().filter(e -> name.equals(e.getName())).findFirst().orElse(null);
++   }
++
++   public LootPool removePool(String name) {
++      checkFrozen();
++      for (LootPool pool : this.f_79109_) {
++         if (name.equals(pool.getName())) {
++            this.f_79109_.remove(pool);
++            return pool;
++         }
++      }
++      return null;
++   }
++
++   public void addPool(LootPool pool) {
++      checkFrozen();
++      if (f_79109_.stream().anyMatch(e -> e == pool || e.getName() != null && e.getName().equals(pool.getName())))
++         throw new RuntimeException("Attempted to add a duplicate pool to loot table: " + pool.getName());
++      this.f_79109_.add(pool);
++   }
++   //======================== FORGE END ===============================================
++
+    public static class Builder implements FunctionUserBuilder<LootTable.Builder> {
+       private final List<LootPool> f_79156_ = Lists.newArrayList();
+       private final List<LootItemFunction> f_79157_ = Lists.newArrayList();
+@@ -230,7 +_,7 @@
+             }
+          }
  
-@@ -210,6 +_,68 @@
+-         if (p_79177_.f_79109_.length > 0) {
++         if (!p_79177_.f_79109_.isEmpty()) {
+             jsonobject.add("pools", p_79179_.serialize(p_79177_.f_79109_));
+          }
  
-     public static LootTable.Builder lootTable() {
-         return new LootTable.Builder();
-+    }
-+
-+    private ResourceLocation lootTableId;
-+    public void setLootTableId(final ResourceLocation id) {
-+        if (this.lootTableId != null) {
-+            throw new IllegalStateException("Attempted to rename loot table from '" + this.lootTableId + "' to '" + id + "': this is not supported");
-+        }
-+        this.lootTableId = java.util.Objects.requireNonNull(id);
-+    }
-+
-+    public ResourceLocation getLootTableId() {
-+        return this.lootTableId;
-+    }
-+
-+    @org.jetbrains.annotations.Nullable
-+    public LootPool removePool(String name) {
-+        checkFrozen();
-+        for (var pool : this.pools) {
-+            if (name.equals(pool.getName())) {
-+                this.pools.remove(pool);
-+                return pool;
-+            }
-+        }
-+        return null;
-+    }
-+
-+    public int poolCount() {
-+        return this.pools.size();
-+    }
-+
-+    public LootPool getPool(int entry) {
-+        return this.pools.get(entry);
-+    }
-+
-+    @org.jetbrains.annotations.Nullable
-+    public LootPool removePool(int entry) {
-+        checkFrozen();
-+        return this.pools.remove(entry);
-+    }
-+
-+    public void addPool(LootPool pool) {
-+        checkFrozen();
-+        if (pools.stream().anyMatch(e -> e == pool)) {
-+            throw new RuntimeException("Attempted to add a duplicate pool to loot table: " + pool);
-+        }
-+        this.pools.add(pool);
-+    }
-+
-+    private boolean isFrozen = false;
-+    public void freeze() {
-+        this.isFrozen = true;
-+        this.pools.forEach(LootPool::freeze);
-+    }
-+
-+    public boolean isFrozen() {
-+        return this.isFrozen;
-+    }
-+
-+    private void checkFrozen() {
-+        if (this.isFrozen()) {
-+            throw new RuntimeException("Attempted to modify LootTable after being finalized!");
-+        }
-     }
- 
-     public static class Builder implements FunctionUserBuilder<LootTable.Builder> {

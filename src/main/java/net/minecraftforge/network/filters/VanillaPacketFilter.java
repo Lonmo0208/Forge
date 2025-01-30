@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Forge Development LLC and contributors
+ * Minecraft Forge - Forge Development LLC
  * SPDX-License-Identifier: LGPL-2.1-only
  */
 
@@ -11,11 +11,12 @@ import java.util.Map;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
 
+import javax.annotation.Nonnull;
+
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.MessageToMessageEncoder;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.Connection;
-import org.jetbrains.annotations.NotNull;
 
 /**
  * A filter for vanilla impl packets.
@@ -33,7 +34,7 @@ public abstract class VanillaPacketFilter extends MessageToMessageEncoder<Packet
     /**
      * Helper function for building the handler map.
      */
-    @NotNull
+    @Nonnull
     protected static <T extends Packet<?>> Map.Entry<Class<? extends Packet<?>>, BiConsumer<Packet<?>, List<? super Packet<?>>>> handler(Class<T> cls, Function<T, ? extends Packet<?>> function)
     {
         return handler(cls, (pkt, list) -> list.add(function.apply(cls.cast(pkt))));
@@ -42,7 +43,7 @@ public abstract class VanillaPacketFilter extends MessageToMessageEncoder<Packet
     /**
      * Helper function for building the handler map.
      */
-    @NotNull
+    @Nonnull
     protected static <T extends Packet<?>> Map.Entry<Class<? extends Packet<?>>, BiConsumer<Packet<?>, List<? super Packet<?>>>> handler(Class<T> cls, BiConsumer<Packet<?>, List<? super Packet<?>>> consumer)
     {
         return new AbstractMap.SimpleEntry<>(cls, consumer);

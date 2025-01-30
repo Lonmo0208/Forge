@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Forge Development LLC and contributors
+ * Minecraft Forge - Forge Development LLC
  * SPDX-License-Identifier: LGPL-2.1-only
  */
 
@@ -10,9 +10,12 @@ import net.minecraft.sounds.SoundEvent;
 import net.minecraft.world.level.block.BucketPickup;
 import net.minecraft.world.level.block.state.BlockState;
 
-public interface IForgeBucketPickup {
-    private BucketPickup self() {
-        return (BucketPickup)this;
+public interface IForgeBucketPickup
+{
+
+    private BucketPickup self()
+    {
+        return (BucketPickup) this;
     }
 
     /**
@@ -24,8 +27,8 @@ public interface IForgeBucketPickup {
      *
      * @return Sound event for pickup sound or empty if there isn't a pickup sound.
      */
-    @SuppressWarnings("deprecation")
-    default Optional<SoundEvent> getPickupSound(BlockState state) {
+    default Optional<SoundEvent> getPickupSound(BlockState state)
+    {
         return self().getPickupSound();
     }
 }

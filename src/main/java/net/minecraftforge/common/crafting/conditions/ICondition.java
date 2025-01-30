@@ -1,63 +1,58 @@
 /*
- * Copyright (c) Forge Development LLC and contributors
+ * Minecraft Forge - Forge Development LLC
  * SPDX-License-Identifier: LGPL-2.1-only
  */
 
 package net.minecraftforge.common.crafting.conditions;
 
-import com.mojang.serialization.Codec;
-import com.mojang.serialization.DynamicOps;
-import com.mojang.serialization.MapCodec;
-
 import net.minecraft.core.Holder;
-import net.minecraft.resources.DelegatingOps;
+import net.minecraft.core.Registry;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.tags.Tag;
 import net.minecraft.tags.TagKey;
-import net.minecraftforge.registries.ForgeRegistries;
 
-import java.util.Collection;
 import java.util.Collections;
-import java.util.Optional;
-import java.util.function.Function;
+import java.util.Map;
 
-import org.jetbrains.annotations.ApiStatus;
+public interface ICondition
+{
+    ResourceLocation getID();
 
-public interface ICondition {
-    Codec<ICondition> CODEC = Codec.lazyInitialized(() -> ForgeRegistries.CONDITION_SERIALIZERS.get().getCodec().dispatch(ICondition::codec, Function.identity()));
-    String DEFAULT_FIELD = "forge:condition";
-    MapCodec<Optional<ICondition>> OPTIONAL_FEILD_CODEC = CODEC.optionalFieldOf(DEFAULT_FIELD);
-    Codec<ICondition> SAFE_CODEC = CODEC.orElse(FalseCondition.INSTANCE);
+    default boolean test(IContext context)
+    {
+        return test();
+    }
 
-    boolean test(IContext context, DynamicOps<?> ops);
+    /**
+     * @deprecated Use {@linkplain #test(IContext) the other more general overload}.
+     */
+    @Deprecated(forRemoval = true, since = "1.18.2")
+    boolean test();
 
-    MapCodec<? extends ICondition> codec();
-
-    interface IContext {
-        /* Key used to attach this context option to a DynamicOps instance */
-        @ApiStatus.Internal
-        public static ResourceLocation KEY = ResourceLocation.fromNamespaceAndPath("forge", "condition_context");
-
-        default <T, O extends DelegatingOps<T>> O wrap(O ops) {
-            return ops.withContext(KEY, this);
-        }
-
-        IContext EMPTY = new IContext() {
+    interface IContext
+    {
+        IContext EMPTY = new IContext()
+        {
             @Override
-            public <T> Collection<Holder<T>> getTag(TagKey<T> key) {
-                return Collections.emptyList();
-            }
-        };
-
-        IContext TAGS_INVALID = new IContext() {
-            @Override
-            public <T> Collection<Holder<T>> getTag(TagKey<T> key) {
-                throw new UnsupportedOperationException("Usage of tag-based conditions is not permitted in this context!");
+            public <T> Map<ResourceLocation, Tag<Holder<T>>> getAllTags(ResourceKey<? extends Registry<T>> registry)
+            {
+                return Collections.emptyMap();
             }
         };
 
         /**
          * Return the requested tag if available, or an empty tag otherwise.
          */
-        <T> Collection<Holder<T>> getTag(TagKey<T> key);
+        default <T> Tag<Holder<T>> getTag(TagKey<T> key)
+        {
+            return getAllTags(key.registry()).getOrDefault(key.location(), Tag.empty());
+        }
+
+        /**
+         * Return all the loaded tags for the passed registry, or an empty map if none is available.
+         * Note that the map and the tags are unmodifiable.
+         */
+        <T> Map<ResourceLocation, Tag<Holder<T>>> getAllTags(ResourceKey<? extends Registry<T>> registry);
     }
 }

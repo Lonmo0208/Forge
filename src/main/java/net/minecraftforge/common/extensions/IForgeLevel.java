@@ -1,15 +1,11 @@
 /*
- * Copyright (c) Forge Development LLC and contributors
+ * Minecraft Forge - Forge Development LLC
  * SPDX-License-Identifier: LGPL-2.1-only
  */
 
 package net.minecraftforge.common.extensions;
 
-import java.util.Collection;
-import java.util.Collections;
-
 import net.minecraftforge.common.capabilities.ICapabilityProvider;
-import net.minecraftforge.entity.PartEntity;
 
 public interface IForgeLevel extends ICapabilityProvider
 {
@@ -26,12 +22,4 @@ public interface IForgeLevel extends ICapabilityProvider
      * @return The new max radius
      */
     public double increaseMaxEntityRadius(double value);
-    /**
-     * All part entities in this world. Used when collecting entities in an AABB to fix parts being
-     * ignored whose parent entity is in a chunk that does not intersect with the AABB.
-     */
-    public default Collection<PartEntity<?>> getPartEntities()
-    {
-        return Collections.emptyList();
-    }
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Forge Development LLC and contributors
+ * Minecraft Forge - Forge Development LLC
  * SPDX-License-Identifier: LGPL-2.1-only
  */
 
@@ -8,11 +8,12 @@ package net.minecraftforge.event.entity.player;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.BowItem;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.InteractionResultHolder;
 import net.minecraft.world.InteractionHand;
-import net.minecraft.world.InteractionResult;
 import net.minecraft.world.level.Level;
 import net.minecraftforge.common.MinecraftForge;
-import org.jetbrains.annotations.NotNull;
+
+import javax.annotation.Nonnull;
 
 /**
  * ArrowNockEvent is fired when a player begins using a bow.<br>
@@ -21,31 +22,35 @@ import org.jetbrains.annotations.NotNull;
  * <br>
  * This event is fired on the {@link MinecraftForge#EVENT_BUS}.
  **/
-public class ArrowNockEvent extends PlayerEvent {
+public class ArrowNockEvent extends PlayerEvent
+{
     private final ItemStack bow;
     private final InteractionHand hand;
-    private final Level level;
+    private final Level world;
     private final boolean hasAmmo;
-    private InteractionResult action;
+    private InteractionResultHolder<ItemStack> action;
 
-    public ArrowNockEvent(Player player, @NotNull ItemStack item, InteractionHand hand, Level level, boolean hasAmmo) {
+    public ArrowNockEvent(Player player, @Nonnull ItemStack item, InteractionHand hand, Level world, boolean hasAmmo)
+    {
         super(player);
         this.bow = item;
         this.hand = hand;
-        this.level = level;
+        this.world = world;
         this.hasAmmo = hasAmmo;
     }
 
-    @NotNull
+    @Nonnull
     public ItemStack getBow() { return this.bow; }
-    public Level getLevel() { return this.level; }
+    public Level getWorld() { return this.world; }
     public InteractionHand getHand() { return this.hand; }
     public boolean hasAmmo() { return this.hasAmmo; }
-    public InteractionResult getAction() {
+    public InteractionResultHolder<ItemStack> getAction()
+    {
         return this.action;
     }
 
-    public void setAction(InteractionResult action) {
+    public void setAction(InteractionResultHolder<ItemStack> action)
+    {
         this.action = action;
     }
 }

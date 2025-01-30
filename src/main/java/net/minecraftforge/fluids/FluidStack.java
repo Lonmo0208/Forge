@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Forge Development LLC and contributors
+ * Minecraft Forge - Forge Development LLC
  * SPDX-License-Identifier: LGPL-2.1-only
  */
 
@@ -7,8 +7,6 @@ package net.minecraftforge.fluids;
 
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
-import net.minecraft.core.Holder;
-import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.Tag;
 import net.minecraft.world.level.material.Fluid;
 import net.minecraft.world.level.material.Fluids;
@@ -16,12 +14,15 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.core.Registry;
 import net.minecraft.network.chat.Component;
 import net.minecraftforge.registries.ForgeRegistries;
+import net.minecraftforge.registries.IRegistryDelegate;
+
+import javax.annotation.Nonnull;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import org.jetbrains.annotations.NotNull;
 
 import java.util.Optional;
 
@@ -41,7 +42,7 @@ public class FluidStack
 
     public static final Codec<FluidStack> CODEC = RecordCodecBuilder.create(
             instance -> instance.group(
-                    BuiltInRegistries.FLUID.byNameCodec().fieldOf("FluidName").forGetter(FluidStack::getFluid),
+                    Registry.FLUID.byNameCodec().fieldOf("FluidName").forGetter(FluidStack::getFluid),
                     Codec.INT.fieldOf("Amount").forGetter(FluidStack::getAmount),
                     CompoundTag.CODEC.optionalFieldOf("Tag").forGetter(stack -> Optional.ofNullable(stack.getTag()))
             ).apply(instance, (fluid, amount, tag) -> {
@@ -54,7 +55,7 @@ public class FluidStack
     private boolean isEmpty;
     private int amount;
     private CompoundTag tag;
-    private Holder.Reference<Fluid> fluidDelegate;
+    private IRegistryDelegate<Fluid> fluidDelegate;
 
     public FluidStack(Fluid fluid, int amount)
     {
@@ -65,10 +66,10 @@ public class FluidStack
         }
         else if (ForgeRegistries.FLUIDS.getKey(fluid) == null)
         {
-            LOGGER.fatal("Failed attempt to create a FluidStack for an unregistered Fluid {} (type {})", ForgeRegistries.FLUIDS.getKey(fluid), fluid.getClass().getName());
+            LOGGER.fatal("Failed attempt to create a FluidStack for an unregistered Fluid {} (type {})", fluid.getRegistryName(), fluid.getClass().getName());
             throw new IllegalArgumentException("Cannot create a fluidstack from an unregistered fluid");
         }
-        this.fluidDelegate = ForgeRegistries.FLUIDS.getDelegateOrThrow(fluid);
+        this.fluidDelegate = fluid.delegate;
         this.amount = amount;
 
         updateEmpty();
@@ -104,7 +105,7 @@ public class FluidStack
             return EMPTY;
         }
 
-        ResourceLocation fluidName = ResourceLocation.parse(nbt.getString("FluidName"));
+        ResourceLocation fluidName = new ResourceLocation(nbt.getString("FluidName"));
         Fluid fluid = ForgeRegistries.FLUIDS.getValue(fluidName);
         if (fluid == null)
         {
@@ -121,7 +122,7 @@ public class FluidStack
 
     public CompoundTag writeToNBT(CompoundTag nbt)
     {
-        nbt.putString("FluidName", ForgeRegistries.FLUIDS.getKey(getFluid()).toString());
+        nbt.putString("FluidName", getFluid().getRegistryName().toString());
         nbt.putInt("Amount", amount);
 
         if (tag != null)
@@ -129,6 +130,22 @@ public class FluidStack
             nbt.put("Tag", tag);
         }
         return nbt;
+    }
+
+    public void writeToPacket(FriendlyByteBuf buf)
+    {
+        buf.writeRegistryId(getFluid());
+        buf.writeVarInt(getAmount());
+        buf.writeNbt(tag);
+    }
+
+    public static FluidStack readFromPacket(FriendlyByteBuf buf)
+    {
+        Fluid fluid = buf.readRegistryId();
+        int amount = buf.readVarInt();
+        CompoundTag tag = buf.readNbt();
+        if (fluid == Fluids.EMPTY) return EMPTY;
+        return new FluidStack(fluid, amount, tag);
     }
 
     public final Fluid getFluid()
@@ -218,12 +235,12 @@ public class FluidStack
 
     public Component getDisplayName()
     {
-        return this.getFluid().getFluidType().getDescription(this);
+        return this.getFluid().getAttributes().getDisplayName(this);
     }
 
     public String getTranslationKey()
     {
-        return this.getFluid().getFluidType().getDescriptionId(this);
+        return this.getFluid().getAttributes().getTranslationKey(this);
     }
 
     /**
@@ -241,7 +258,7 @@ public class FluidStack
      *            The FluidStack for comparison
      * @return true if the Fluids (IDs and NBT Tags) are the same
      */
-    public boolean isFluidEqual(@NotNull FluidStack other)
+    public boolean isFluidEqual(@Nonnull FluidStack other)
     {
         return getFluid() == other.getFluid() && isFluidStackTagEqual(other);
     }
@@ -254,7 +271,7 @@ public class FluidStack
     /**
      * Determines if the NBT Tags are equal. Useful if the FluidIDs are known to be equal.
      */
-    public static boolean areFluidStackTagsEqual(@NotNull FluidStack stack1, @NotNull FluidStack stack2)
+    public static boolean areFluidStackTagsEqual(@Nonnull FluidStack stack1, @Nonnull FluidStack stack2)
     {
         return stack1.isFluidStackTagEqual(stack2);
     }
@@ -264,7 +281,7 @@ public class FluidStack
      *
      * @return true if this FluidStack contains the other FluidStack (same fluid and >= amount)
      */
-    public boolean containsFluid(@NotNull FluidStack other)
+    public boolean containsFluid(@Nonnull FluidStack other)
     {
         return isFluidEqual(other) && amount >= other.amount;
     }
@@ -289,7 +306,7 @@ public class FluidStack
      *            The ItemStack for comparison
      * @return true if the Fluids (IDs and NBT Tags) are the same
      */
-    public boolean isFluidEqual(@NotNull ItemStack other)
+    public boolean isFluidEqual(@Nonnull ItemStack other)
     {
         return FluidUtil.getFluidContained(other).map(this::isFluidEqual).orElse(false);
     }
@@ -299,6 +316,7 @@ public class FluidStack
     {
         int code = 1;
         code = 31*code + getFluid().hashCode();
+        code = 31*code + amount;
         if (tag != null)
             code = 31*code + tag.hashCode();
         return code;

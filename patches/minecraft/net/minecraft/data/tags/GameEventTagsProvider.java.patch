@@ -1,13 +1,16 @@
 --- a/net/minecraft/data/tags/GameEventTagsProvider.java
 +++ b/net/minecraft/data/tags/GameEventTagsProvider.java
-@@ -59,6 +_,10 @@
-         super(p_256060_, Registries.GAME_EVENT, p_255621_);
-     }
+@@ -6,8 +_,13 @@
+ import net.minecraft.world.level.gameevent.GameEvent;
  
-+    public GameEventTagsProvider(PackOutput p_256060_, CompletableFuture<HolderLookup.Provider> p_255621_, String modId, @org.jetbrains.annotations.Nullable net.minecraftforge.common.data.ExistingFileHelper existingFileHelper) {
-+        super(p_256060_, Registries.GAME_EVENT, p_255621_, modId, existingFileHelper);
-+    }
-+
-     @Override
-     protected void addTags(HolderLookup.Provider p_255981_) {
-         this.tag(GameEventTags.VIBRATIONS).addAll(VIBRATIONS_EXCEPT_FLAP).addAll(VibrationSystem.RESONANCE_EVENTS).add(GameEvent.FLAP.key());
+ public class GameEventTagsProvider extends TagsProvider<GameEvent> {
++   /** @deprecated Forge: Use the {@link #GameEventTagsProvider(DataGenerator, String, net.minecraftforge.common.data.ExistingFileHelper) mod id variant} */
++   @Deprecated
+    public GameEventTagsProvider(DataGenerator p_176826_) {
+       super(p_176826_, Registry.f_175412_);
++   }
++   public GameEventTagsProvider(DataGenerator p_176826_, String modId, @org.jetbrains.annotations.Nullable net.minecraftforge.common.data.ExistingFileHelper existingFileHelper) {
++      super(p_176826_, Registry.f_175412_, modId, existingFileHelper);
+    }
+ 
+    protected void m_6577_() {

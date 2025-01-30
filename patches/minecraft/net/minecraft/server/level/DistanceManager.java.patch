@@ -1,74 +1,63 @@
 --- a/net/minecraft/server/level/DistanceManager.java
 +++ b/net/minecraft/server/level/DistanceManager.java
-@@ -50,6 +_,7 @@
-     final Executor mainThreadExecutor;
-     private long ticketTickCounter;
-     private int simulationDistance = 10;
-+    private final Long2ObjectOpenHashMap<SortedArraySet<Ticket<?>>> forcedTickets = new Long2ObjectOpenHashMap<>();
+@@ -59,6 +_,8 @@
+    private long f_140771_;
+    private int f_183902_ = 10;
  
-     protected DistanceManager(Executor p_140774_, Executor p_140775_) {
-         TaskScheduler<Runnable> taskscheduler = TaskScheduler.wrapExecutor("player ticket throttler", p_140775_);
-@@ -150,6 +_,11 @@
-         if (p_140786_.getTicketLevel() < i) {
-             this.ticketTracker.update(p_140785_, p_140786_.getTicketLevel(), true);
-         }
++   private final Long2ObjectOpenHashMap<SortedArraySet<Ticket<?>>> forcedTickets = new Long2ObjectOpenHashMap<>();
 +
-+        if (p_140786_.isForceTicks()) {
-+            var tickets = forcedTickets.computeIfAbsent(p_140785_, e -> SortedArraySet.create(4));
-+            tickets.addOrGet(ticket);
-+        }
-     }
+    protected DistanceManager(Executor p_140774_, Executor p_140775_) {
+       ProcessorHandle<Runnable> processorhandle = ProcessorHandle.m_18714_("player ticket throttler", p_140775_::execute);
+       ChunkTaskPriorityQueueSorter chunktaskpriorityqueuesorter = new ChunkTaskPriorityQueueSorter(ImmutableList.of(processorhandle), p_140774_, 4);
+@@ -164,6 +_,10 @@
+          this.f_140762_.m_140715_(p_140785_, p_140786_.m_9433_(), true);
+       }
  
-     void removeTicket(long p_140819_, Ticket<?> p_140820_) {
-@@ -162,6 +_,14 @@
-         }
++      if (p_140786_.isForceTicks()) {
++          SortedArraySet<Ticket<?>> tickets = forcedTickets.computeIfAbsent(p_140785_, e -> SortedArraySet.m_14246_(4));
++          tickets.m_14253_(ticket);
++      }
+    }
  
-         this.ticketTracker.update(p_140819_, getTicketLevelAt(sortedarrayset), false);
+    void m_140818_(long p_140819_, Ticket<?> p_140820_) {
+@@ -176,6 +_,13 @@
+       }
+ 
+       this.f_140762_.m_140715_(p_140819_, m_140797_(sortedarrayset), false);
 +
++      if (p_140820_.isForceTicks()) {
++          SortedArraySet<Ticket<?>> tickets = forcedTickets.get(p_140819_);
++          if (tickets != null) {
++              tickets.remove(p_140820_);
++          }
++      }
+    }
+ 
+    public <T> void m_140792_(TicketType<T> p_140793_, ChunkPos p_140794_, int p_140795_, T p_140796_) {
+@@ -201,6 +_,14 @@
+       this.f_183901_.m_184165_(i, ticket);
+    }
+ 
++   public <T> void registerTicking(TicketType<T> type, ChunkPos pos, int distance, T value) {
++      this.m_140784_(pos.m_45588_(), new Ticket<>(type, 33 - distance, value, true));
++   }
 +
-+        if (p_140820_.isForceTicks()) {
-+            var tickets = forcedTickets.get(p_140819_);
-+            if (tickets != null) {
-+                tickets.remove(p_140820_);
-+            }
-+        }
-     }
- 
-     public <T> void addTicket(TicketType<T> p_140793_, ChunkPos p_140794_, int p_140795_, T p_140796_) {
-@@ -174,14 +_,22 @@
-     }
- 
-     public <T> void addRegionTicket(TicketType<T> p_140841_, ChunkPos p_140842_, int p_140843_, T p_140844_) {
--        Ticket<T> ticket = new Ticket<>(p_140841_, ChunkLevel.byStatus(FullChunkStatus.FULL) - p_140843_, p_140844_);
-+        addRegionTicket(p_140841_, p_140842_, p_140843_, p_140844_, false);
-+    }
++   public <T> void releaseTicking(TicketType<T> type, ChunkPos pos, int distance, T value) {
++      this.m_140818_(pos.m_45588_(), new Ticket<>(type, 33 - distance, value, true));
++   }
 +
-+    public <T> void addRegionTicket(TicketType<T> p_140841_, ChunkPos p_140842_, int p_140843_, T p_140844_, boolean forceTicks) {
-+       Ticket<T> ticket = new Ticket<>(p_140841_, ChunkLevel.byStatus(FullChunkStatus.FULL) - p_140843_, p_140844_, forceTicks);
-         long i = p_140842_.toLong();
-         this.addTicket(i, ticket);
-         this.tickingTicketsTracker.addTicket(i, ticket);
-     }
+    private SortedArraySet<Ticket<?>> m_140857_(long p_140858_) {
+       return this.f_140761_.computeIfAbsent(p_140858_, (p_183923_) -> {
+          return SortedArraySet.m_14246_(4);
+@@ -286,6 +_,11 @@
  
-     public <T> void removeRegionTicket(TicketType<T> p_140850_, ChunkPos p_140851_, int p_140852_, T p_140853_) {
--        Ticket<T> ticket = new Ticket<>(p_140850_, ChunkLevel.byStatus(FullChunkStatus.FULL) - p_140852_, p_140853_);
-+        removeRegionTicket(p_140850_, p_140851_, p_140852_, p_140853_, false);
-+    }
+    public String m_140837_() {
+       return this.f_140766_.m_140558_();
++   }
 +
-+    public <T> void removeRegionTicket(TicketType<T> p_140850_, ChunkPos p_140851_, int p_140852_, T p_140853_, boolean forceTicks) {
-+       Ticket<T> ticket = new Ticket<>(p_140850_, ChunkLevel.byStatus(FullChunkStatus.FULL) - p_140852_, p_140853_, forceTicks);
-         long i = p_140851_.toLong();
-         this.removeTicket(i, ticket);
-         this.tickingTicketsTracker.removeTicket(i, ticket);
-@@ -270,6 +_,11 @@
++   public boolean shouldForceTicks(long chunkPos) {
++       SortedArraySet<Ticket<?>> tickets = forcedTickets.get(chunkPos);
++       return tickets != null && !tickets.isEmpty();
+    }
  
-     public String getDebugStatus() {
-         return this.ticketDispatcher.getDebugStatus();
-+    }
-+
-+    public boolean shouldForceTicks(long chunkPos) {
-+        SortedArraySet<Ticket<?>> tickets = forcedTickets.get(chunkPos);
-+        return tickets != null && !tickets.isEmpty();
-     }
- 
-     private void dumpTickets(String p_143208_) {
+    private void m_143207_(String p_143208_) {

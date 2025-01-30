@@ -1,11 +1,20 @@
 package net.minecraftforge.forge.tasks
 
-import groovy.transform.CompileStatic
 import groovy.transform.EqualsAndHashCode
 
+import java.util.ArrayList
+import java.util.HashMap
+import java.util.TreeMap
+import java.util.TreeSet
+import java.util.function.BiConsumer
+
+import org.gradle.api.DefaultTask
 import org.gradle.api.tasks.*
-import org.objectweb.asm.tree.AbstractInsnNode
+
+import org.objectweb.asm.Opcodes
+import org.objectweb.asm.Type
 import org.objectweb.asm.tree.ClassNode
+import org.objectweb.asm.tree.FieldNode
 import org.objectweb.asm.tree.MethodNode
 
 import static org.objectweb.asm.Opcodes.*
@@ -25,17 +34,17 @@ abstract class FieldCompareFinder extends BytecodeFinder {
     
     @Override
     protected process(ClassNode parent, MethodNode node) {
-        AbstractInsnNode last = null
+        def last = null
         def parentInstance = new ObjectTarget(owner: parent.name, name: '', desc: '')
         for (int x = 0; x < node.instructions.size(); x++) {
             def current = node.instructions.get(x)
-            if (current.opcode === IF_ACMPEQ || current.opcode === IF_ACMPNE) {
-                if (last !== null && (last.opcode === GETSTATIC || last.opcode === GETFIELD)) {
+            if (current.opcode == IF_ACMPEQ || current.opcode == IF_ACMPNE) {
+                if (last != null && (last.opcode == GETSTATIC || last.opcode == GETFIELD)) {
                     def target = new Search(cls: last.owner, name: last.name)
                     def wanted = fieldsReverse.get(target)
                     def original = fields.get(wanted)
                     def instance = new ObjectTarget(owner: parent.name, name: node.name, desc: node.desc)
-                    if (wanted !== null && (original.blacklist === null || (!original.blacklist.contains(instance) && !original.blacklist.contains(parentInstance)))) {
+                    if (wanted != null && (original.blacklist == null || (!original.blacklist.contains(instance) && !original.blacklist.contains(parentInstance)))) {
                         targets.computeIfAbsent(wanted, { k -> new TreeSet() }).add(instance)
                     }
                 }
@@ -59,10 +68,9 @@ abstract class FieldCompareFinder extends BytecodeFinder {
 		}
         return ret
     }
-
-    @CompileStatic
+    
     @EqualsAndHashCode(excludes = ['replacement', 'blacklist'])
-    static class Search {
+    public static class Search {
         @Input
         String cls
         
@@ -81,17 +89,17 @@ abstract class FieldCompareFinder extends BytecodeFinder {
             return cls + '.' + name
         }
         
-        def blacklist(String owner, String name, String desc) {
-            if (blacklist === null)
-                blacklist = new HashSet<>()
+        def blacklist(def owner, def name, def desc) {
+            if (blacklist == null)
+                blacklist = new HashSet()
             blacklist.add(new ObjectTarget(owner: owner, name: name, desc: desc))
         }
-        def blacklist(String owner) {
+        def blacklist(def owner) {
             blacklist(owner, '', '')
         }
     }
     
-    void fields(Closure cl) {
+    def fields(Closure cl) {
         new ClosureHelper(cl, {name, ccl ->
             def search = ClosureHelper.apply(new Search(), ccl)
             this.fields.put(name, search)

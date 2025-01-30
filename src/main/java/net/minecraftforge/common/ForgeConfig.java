@@ -1,33 +1,36 @@
 /*
- * Copyright (c) Forge Development LLC and contributors
+ * Minecraft Forge - Forge Development LLC
  * SPDX-License-Identifier: LGPL-2.1-only
  */
 
 package net.minecraftforge.common;
 
+import static net.minecraftforge.fml.Logging.FORGEMOD;
+
 import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.Logging;
 import net.minecraftforge.fml.event.config.ModConfigEvent;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.logging.log4j.LogManager;
 
 import net.minecraftforge.common.ForgeConfigSpec.BooleanValue;
+import net.minecraftforge.common.ForgeConfigSpec.DoubleValue;
 import net.minecraftforge.common.ForgeConfigSpec.ConfigValue;
-import org.apache.logging.log4j.Logger;
+
 
 public class ForgeConfig {
-    private static final Logger LOGGER = LogManager.getLogger();
-
     public static class Server {
         public final BooleanValue removeErroringBlockEntities;
 
-        public final BooleanValue removeErroringEntities;
-
         public final BooleanValue fullBoundingBoxLadders;
 
-        public final ConfigValue<String> permissionHandler;
+        public final DoubleValue zombieBaseSummonChance;
+        public final DoubleValue zombieBabyChance;
 
-        public final BooleanValue advertiseDedicatedServerToLan;
+        public final BooleanValue treatEmptyTagsAsAir;
+
+        public final BooleanValue fixAdvancementLoading;
+
+        public final ConfigValue<String> permissionHandler;
 
         Server(ForgeConfigSpec.Builder builder) {
             builder.comment("Server configuration settings")
@@ -39,27 +42,38 @@ public class ForgeConfig {
                     .worldRestart()
                     .define("removeErroringBlockEntities", false);
 
-            removeErroringEntities = builder
-                    .comment("Set this to true to remove any Entity (Note: Does not include BlockEntities) that throws an error in its tick method instead of closing the server and reporting a crash log. BE WARNED THIS COULD SCREW UP EVERYTHING USE SPARINGLY WE ARE NOT RESPONSIBLE FOR DAMAGES.")
-                    .translation("forge.configgui.removeErroringEntities")
-                    .worldRestart()
-                    .define("removeErroringEntities", false);
-
             fullBoundingBoxLadders = builder
                     .comment("Set this to true to check the entire entity's collision bounding box for ladders instead of just the block they are in. Causes noticeable differences in mechanics so default is vanilla behavior. Default: false.")
                     .translation("forge.configgui.fullBoundingBoxLadders")
                     .worldRestart()
                     .define("fullBoundingBoxLadders", false);
 
+            zombieBaseSummonChance = builder
+                    .comment("Base zombie summoning spawn chance. Allows changing the bonus zombie summoning mechanic.")
+                    .translation("forge.configgui.zombieBaseSummonChance")
+                    .worldRestart()
+                    .defineInRange("zombieBaseSummonChance", 0.1D, 0.0D, 1.0D);
+
+            zombieBabyChance = builder
+                    .comment("Chance that a zombie (or subclass) is a baby. Allows changing the zombie spawning mechanic.")
+                    .translation("forge.configgui.zombieBabyChance")
+                    .worldRestart()
+                    .defineInRange("zombieBabyChance", 0.05D, 0.0D, 1.0D);
+
+            treatEmptyTagsAsAir = builder
+                    .comment("Vanilla will treat crafting recipes using empty tags as air, and allow you to craft with nothing in that slot. This changes empty tags to use BARRIER as the item. To prevent crafting with air.")
+                    .translation("forge.configgui.treatEmptyTagsAsAir")
+                    .define("treatEmptyTagsAsAir", false);
+
+            fixAdvancementLoading = builder
+                    .comment("Fix advancement loading to use a proper topological sort. This may have visibility side-effects and can thus be turned off if needed for data-pack compatibility.")
+                    .translation("forge.configgui.fixAdvancementLoading")
+                    .define("fixAdvancementLoading", true);
+
             permissionHandler = builder
                     .comment("The permission handler used by the server. Defaults to forge:default_handler if no such handler with that name is registered.")
                     .translation("forge.configgui.permissionHandler")
                     .define("permissionHandler", "forge:default_handler");
-
-            advertiseDedicatedServerToLan = builder
-                    .comment("Set this to true to enable advertising the dedicated server to local LAN clients so that it shows up in the Multiplayer screen automatically.")
-                    .translation("forge.configgui.advertiseDedicatedServerToLan")
-                    .define("advertiseDedicatedServerToLan", true);
 
             builder.pop();
         }
@@ -69,40 +83,47 @@ public class ForgeConfig {
      * General configuration that doesn't need to be synchronized but needs to be available before server startup
      */
     public static class Common {
-        public enum MigrationHelperMode {
-            OFF,
-            ONLY_IN_DEV_ENV,
-            ALWAYS
-        }
-
-        public final ForgeConfigSpec.EnumValue<MigrationHelperMode> migrationHelperMode;
+        public final ForgeConfigSpec.ConfigValue<? extends String> defaultWorldType;
 
         Common(ForgeConfigSpec.Builder builder) {
             builder.comment("General configuration settings")
                     .push("general");
 
-            migrationHelperMode = builder
-                    .comment("A config option to help developers find known legacy modded tags that have common convention equivalents when running on integrated server. Defaults to OFF.")
-                    .translation("forge.configgui.migrationHelperMode")
-                    .defineEnum("logLegacyTagWarnings", MigrationHelperMode.OFF);
+            defaultWorldType = builder
+                    .comment("Defines a default world type to use. The vanilla default world type is represented by 'default'.",
+                             "The modded world types are registry names which should include the registry namespace, such as 'examplemod:example_world_type'.")
+                    .translation("forge.configgui.defaultWorldType")
+                    .define("defaultWorldType", "default");
 
             builder.pop();
         }
+
     }
 
     /**
      * Client specific configuration - only loaded clientside from forge-client.toml
      */
     public static class Client {
+        public final BooleanValue alwaysSetupTerrainOffThread;
+
         public final BooleanValue experimentalForgeLightPipelineEnabled;
 
         public final BooleanValue showLoadWarnings;
 
-        public final BooleanValue allowMipmapLowering;
+        public final BooleanValue useCombinedDepthStencilAttachment;
+
+        public final BooleanValue forceSystemNanoTime;
 
         Client(ForgeConfigSpec.Builder builder) {
             builder.comment("Client only settings, mostly things related to rendering")
                    .push("client");
+
+            alwaysSetupTerrainOffThread = builder
+                .comment("Enable Forge to queue all chunk updates to the Chunk Update thread.",
+                        "May increase FPS significantly, but may also cause weird rendering lag.",
+                        "Not recommended for computers without a significant number of cores available.")
+                .translation("forge.configgui.alwaysSetupTerrainOffThread")
+                .define("alwaysSetupTerrainOffThread", false);
 
             experimentalForgeLightPipelineEnabled = builder
                 .comment("EXPERIMENTAL: Enable the Forge block rendering pipeline - fixes the lighting of custom models.")
@@ -114,22 +135,17 @@ public class ForgeConfig {
                 .translation("forge.configgui.showLoadWarnings")
                 .define("showLoadWarnings", true);
 
-            allowMipmapLowering = builder
-                .comment("When enabled, Forge will allow mipmaps to be lowered in real-time. This is the default behavior in vanilla. Use this if you experience issues with resource packs that use textures lower than 8x8.")
-                .translation("forge.configgui.allowMipmapLowering")
-                .define("allowMipmapLowering", false);
+            useCombinedDepthStencilAttachment = builder
+                    .comment("Set to true to use a combined DEPTH_STENCIL attachment instead of two separate ones.")
+                    .translation("forge.configgui.useCombinedDepthStencilAttachment")
+                    .define("useCombinedDepthStencilAttachment", false);
+
+            forceSystemNanoTime = builder
+                    .comment("Forces the use of System.nanoTime instead of glfwGetTime, as the main Util time provider")
+                    .translation("forge.configgui.forceSystemNanoTime")
+                    .define("forceSystemNanoTime", false);
 
             builder.pop();
-        }
-
-        // Allow these to be called before the config is loaded because its used before loading the error screens.
-        // Prevents a ton of spam when an error screen is displayed.
-        public final boolean showLoadWarnings() {
-            return clientSpec.isLoaded() ? showLoadWarnings.get() : showLoadWarnings.getDefault();
-        }
-
-        public final boolean allowMipmapLowering() {
-            return clientSpec.isLoaded() ? allowMipmapLowering.get() : allowMipmapLowering.getDefault();
         }
     }
 
@@ -161,12 +177,12 @@ public class ForgeConfig {
 
     @SubscribeEvent
     public static void onLoad(final ModConfigEvent.Loading configEvent) {
-        LOGGER.debug(Logging.FORGEMOD, "Loaded forge config file {}", configEvent.getConfig().getFileName());
+        LogManager.getLogger().debug(FORGEMOD, "Loaded forge config file {}", configEvent.getConfig().getFileName());
     }
 
     @SubscribeEvent
     public static void onFileChange(final ModConfigEvent.Reloading configEvent) {
-        LOGGER.debug(Logging.FORGEMOD, "Forge config just got changed on the file system!");
+        LogManager.getLogger().debug(FORGEMOD, "Forge config just got changed on the file system!");
     }
 
     //General

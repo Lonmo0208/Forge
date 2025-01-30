@@ -1,9 +1,12 @@
 /*
- * Copyright (c) Forge Development LLC and contributors
+ * Minecraft Forge - Forge Development LLC
  * SPDX-License-Identifier: LGPL-2.1-only
  */
 
 package net.minecraftforge.event.furnace;
+
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
@@ -12,8 +15,6 @@ import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.ForgeEventFactory;
 import net.minecraftforge.eventbus.api.Cancelable;
 import net.minecraftforge.eventbus.api.Event;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 
 /**
  * {@link FurnaceFuelBurnTimeEvent} is fired when determining the fuel value for an ItemStack. <br>
@@ -31,13 +32,13 @@ import org.jetbrains.annotations.Nullable;
 @Cancelable
 public class FurnaceFuelBurnTimeEvent extends Event
 {
-    @NotNull
+    @Nonnull
     private final ItemStack itemStack;
     @Nullable
     private final RecipeType<?> recipeType;
     private int burnTime;
 
-    public FurnaceFuelBurnTimeEvent(@NotNull ItemStack itemStack, int burnTime, @Nullable RecipeType<?> recipeType)
+    public FurnaceFuelBurnTimeEvent(@Nonnull ItemStack itemStack, int burnTime, @Nullable RecipeType<?> recipeType)
     {
         this.itemStack = itemStack;
         this.burnTime = burnTime;
@@ -47,7 +48,7 @@ public class FurnaceFuelBurnTimeEvent extends Event
     /**
      * Get the ItemStack "fuel" in question.
      */
-    @NotNull
+    @Nonnull
     public ItemStack getItemStack()
     {
         return itemStack;

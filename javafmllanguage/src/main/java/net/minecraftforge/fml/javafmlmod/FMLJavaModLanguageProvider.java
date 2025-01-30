@@ -1,6 +1,20 @@
 /*
- * Copyright (c) Forge Development LLC and contributors
- * SPDX-License-Identifier: LGPL-2.1-only
+ * Minecraft Forge
+ * Copyright (c) 2016-2021.
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation version 2.1
+ * of the License.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
 package net.minecraftforge.fml.javafmlmod;
@@ -31,8 +45,21 @@ public class FMLJavaModLanguageProvider implements IModLanguageProvider
 {
     private static final Logger LOGGER = LogManager.getLogger();
 
-    private record FMLModTarget(String className, String modId) implements IModLanguageProvider.IModLanguageLoader {
+    private static class FMLModTarget implements IModLanguageProvider.IModLanguageLoader {
         private static final Logger LOGGER = FMLJavaModLanguageProvider.LOGGER;
+        private final String className;
+        private final String modId;
+
+        private FMLModTarget(String className, String modId)
+        {
+            this.className = className;
+            this.modId = modId;
+        }
+
+        public String getModId()
+        {
+            return modId;
+        }
 
         @SuppressWarnings("unchecked")
         @Override
@@ -81,7 +108,7 @@ public class FMLJavaModLanguageProvider implements IModLanguageProvider
                     .filter(ad -> ad.annotationType().equals(MODANNOTATION))
                     .peek(ad -> LOGGER.debug(SCAN, "Found @Mod class {} with id {}", ad.clazz().getClassName(), ad.annotationData().get("value")))
                     .map(ad -> new FMLModTarget(ad.clazz().getClassName(), (String)ad.annotationData().get("value")))
-                    .collect(Collectors.toMap(FMLModTarget::modId, Function.identity(), (a,b)->a));
+                    .collect(Collectors.toMap(FMLModTarget::getModId, Function.identity(), (a,b)->a));
             scanResult.addLanguageLoader(modTargetMap);
         };
     }

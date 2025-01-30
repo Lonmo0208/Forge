@@ -1,14 +1,13 @@
 /*
- * Copyright (c) Forge Development LLC and contributors
+ * Minecraft Forge - Forge Development LLC
  * SPDX-License-Identifier: LGPL-2.1-only
  */
 
 package net.minecraftforge.registries;
 
 import net.minecraft.core.Holder;
-import net.minecraft.core.MappedRegistry;
 import net.minecraft.core.Registry;
-import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.data.BuiltinRegistries;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
 import org.jetbrains.annotations.NotNull;
@@ -22,16 +21,40 @@ import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
 
-public final class RegistryObject<T> implements Supplier<T> {
+public final class RegistryObject<T> implements Supplier<T>
+{
     @Nullable
     private final ResourceLocation name;
     @Nullable
-    private final ResourceKey<T> key;
+    private ResourceKey<T> key;
     private final boolean optionalRegistry;
     @Nullable
     private T value;
     @Nullable
-    private Supplier<Holder<T>> holder;
+    private Holder<T> holder;
+
+    /**
+     * @deprecated The uniqueness of registry super types will not be guaranteed starting in 1.19.
+     * Use {@link #create(ResourceLocation, ResourceLocation, String)}.
+     */
+    @Deprecated(forRemoval = true, since = "1.18.2")
+    public static <T extends IForgeRegistryEntry<T>, U extends T> RegistryObject<U> of(final ResourceLocation name, Supplier<Class<? super T>> registryType) {
+        return new RegistryObject<>(name, registryType);
+    }
+
+    /**
+     * Factory for a {@link RegistryObject} that stores the value of an object from the provided forge registry once it is ready.
+     *
+     * @param name the name of the object to look up in the forge registry
+     * @param registry the forge registry
+     * @return a {@link RegistryObject} that stores the value of an object from the provided forge registry once it is ready
+     * @deprecated Use {@link #create(ResourceLocation, IForgeRegistry)} instead.
+     */
+    @Deprecated(forRemoval = true, since = "1.18.2")
+    public static <T extends IForgeRegistryEntry<T>, U extends T> RegistryObject<U> of(final ResourceLocation name, IForgeRegistry<T> registry)
+    {
+        return new RegistryObject<>(name, registry);
+    }
 
     /**
      * Factory for a {@link RegistryObject} that stores the value of an object from the provided forge registry once it is ready.
@@ -40,8 +63,18 @@ public final class RegistryObject<T> implements Supplier<T> {
      * @param registry the forge registry
      * @return a {@link RegistryObject} that stores the value of an object from the provided forge registry once it is ready
      */
-    public static <T, U extends T> RegistryObject<U> create(final ResourceLocation name, IForgeRegistry<T> registry) {
-        return new RegistryObject<U>(name, registry);
+    public static <T extends IForgeRegistryEntry<T>, U extends T> RegistryObject<U> create(final ResourceLocation name, IForgeRegistry<T> registry)
+    {
+        return new RegistryObject<>(name, registry);
+    }
+
+    /**
+     * @deprecated The uniqueness of registry super types will not be guaranteed starting in 1.19.
+     * Use {@link #create(ResourceLocation, ResourceLocation, String)}.
+     */
+    @Deprecated(forRemoval = true, since = "1.18.2")
+    public static <T extends IForgeRegistryEntry<T>, U extends T> RegistryObject<U> of(final ResourceLocation name, final Class<T> baseType, String modid) {
+        return new RegistryObject<>(name, baseType, modid);
     }
 
     /**
@@ -51,14 +84,36 @@ public final class RegistryObject<T> implements Supplier<T> {
      * Use {@link #createOptional(ResourceLocation, ResourceKey, String)} for RegistryObjects of optional registries.
      *
      * @param name the name of the object to look up in a registry
-     * @param registryKey the key of the registry. Supports lookups on {@link BuiltInRegistries} and {@link RegistryManager#ACTIVE}.
+     * @param registryKey the key of the registry. Supports lookups on {@link BuiltinRegistries}, {@link Registry}, and {@link RegistryManager#ACTIVE}.
+     * @param modid the mod id calling context
+     * @return a {@link RegistryObject} that stores the value of an object from a registry once it is ready
+     * @see #createOptional(ResourceLocation, ResourceKey, String)
+     * @see #create(ResourceLocation, IForgeRegistry)
+     * @see #create(ResourceLocation, ResourceLocation, String)
+     * @deprecated Use {@link #create(ResourceLocation, ResourceKey, String)} instead.
+     */
+    @Deprecated(forRemoval = true, since = "1.18.2")
+    public static <T, U extends T> RegistryObject<U> of(final ResourceLocation name, final ResourceKey<? extends Registry<T>> registryKey, String modid)
+    {
+        return new RegistryObject<>(name, registryKey.location(), modid, false);
+    }
+
+    /**
+     * Factory for a {@link RegistryObject} that stores the value of an object from a registry once it is ready based on a lookup of the provided registry key.
+     * <p>
+     * If a registry with the given key cannot be found, an exception will be thrown when trying to fill this RegistryObject.
+     * Use {@link #createOptional(ResourceLocation, ResourceKey, String)} for RegistryObjects of optional registries.
+     *
+     * @param name the name of the object to look up in a registry
+     * @param registryKey the key of the registry. Supports lookups on {@link BuiltinRegistries}, {@link Registry}, and {@link RegistryManager#ACTIVE}.
      * @param modid the mod id calling context
      * @return a {@link RegistryObject} that stores the value of an object from a registry once it is ready
      * @see #createOptional(ResourceLocation, ResourceKey, String)
      * @see #create(ResourceLocation, IForgeRegistry)
      * @see #create(ResourceLocation, ResourceLocation, String)
      */
-    public static <T, U extends T> RegistryObject<U> create(final ResourceLocation name, final ResourceKey<? extends Registry<T>> registryKey, String modid) {
+    public static <T, U extends T> RegistryObject<U> create(final ResourceLocation name, final ResourceKey<? extends Registry<T>> registryKey, String modid)
+    {
         return new RegistryObject<>(name, registryKey.location(), modid, false);
     }
 
@@ -70,14 +125,16 @@ public final class RegistryObject<T> implements Supplier<T> {
      * Use {@link #create(ResourceLocation, ResourceKey, String)} for RegistryObjects that should throw exceptions on missing registry.
      *
      * @param name the name of the object to look up in a registry
-     * @param registryKey the key of the registry. Supports lookups on {@link BuiltInRegistries} and {@link RegistryManager#ACTIVE}.
+     * @param registryKey the key of the registry. Supports lookups on {@link BuiltinRegistries}, {@link Registry}, and {@link RegistryManager#ACTIVE}.
      * @param modid the mod id calling context
      * @return a {@link RegistryObject} that stores the value of an object from a registry once it is ready
      * @see #create(ResourceLocation, ResourceKey, String)
      * @see #create(ResourceLocation, IForgeRegistry)
      * @see #create(ResourceLocation, ResourceLocation, String)
      */
-    public static <T, U extends T> RegistryObject<U> createOptional(final ResourceLocation name, final ResourceKey<? extends Registry<T>> registryKey, String modid) {
+    public static <T, U extends T> RegistryObject<U> createOptional(final ResourceLocation name, final ResourceKey<? extends Registry<T>> registryKey,
+            String modid)
+    {
         return new RegistryObject<>(name, registryKey.location(), modid, true);
     }
 
@@ -88,14 +145,36 @@ public final class RegistryObject<T> implements Supplier<T> {
      * Use {@link #createOptional(ResourceLocation, ResourceLocation, String)} for RegistryObjects of optional registries.
      *
      * @param name the name of the object to look up in a registry
-     * @param registryName the name of the registry. Supports lookups on {@link BuiltInRegistries} and {@link RegistryManager#ACTIVE}.
+     * @param registryName the name of the registry. Supports lookups on {@link BuiltinRegistries}, {@link Registry}, and {@link RegistryManager#ACTIVE}.
+     * @param modid the mod id calling context
+     * @return a {@link RegistryObject} that stores the value of an object from a registry once it is ready
+     * @see #createOptional(ResourceLocation, ResourceLocation, String)
+     * @see #create(ResourceLocation, IForgeRegistry)
+     * @see #create(ResourceLocation, ResourceKey, String)
+     * @deprecated Use {@link #create(ResourceLocation, ResourceLocation, String)} instead.
+     */
+    @Deprecated(forRemoval = true, since = "1.18.2")
+    public static <T, U extends T> RegistryObject<U> of(final ResourceLocation name, final ResourceLocation registryName, String modid)
+    {
+        return new RegistryObject<>(name, registryName, modid, false);
+    }
+
+    /**
+     * Factory for a {@link RegistryObject} that stores the value of an object from a registry once it is ready based on a lookup of the provided registry name.
+     * <p>
+     * If a registry with the given name cannot be found, an exception will be thrown when trying to fill this RegistryObject.
+     * Use {@link #createOptional(ResourceLocation, ResourceLocation, String)} for RegistryObjects of optional registries.
+     *
+     * @param name the name of the object to look up in a registry
+     * @param registryName the name of the registry. Supports lookups on {@link BuiltinRegistries}, {@link Registry}, and {@link RegistryManager#ACTIVE}.
      * @param modid the mod id calling context
      * @return a {@link RegistryObject} that stores the value of an object from a registry once it is ready
      * @see #createOptional(ResourceLocation, ResourceLocation, String)
      * @see #create(ResourceLocation, IForgeRegistry)
      * @see #create(ResourceLocation, ResourceKey, String)
      */
-    public static <T, U extends T> RegistryObject<U> create(final ResourceLocation name, final ResourceLocation registryName, String modid) {
+    public static <T, U extends T> RegistryObject<U> create(final ResourceLocation name, final ResourceLocation registryName, String modid)
+    {
         return new RegistryObject<>(name, registryName, modid, false);
     }
 
@@ -107,14 +186,15 @@ public final class RegistryObject<T> implements Supplier<T> {
      * Use {@link #create(ResourceLocation, ResourceLocation, String)} for RegistryObjects that should throw exceptions on missing registry.
      *
      * @param name the name of the object to look up in a registry
-     * @param registryName the name of the registry. Supports lookups on {@link BuiltInRegistries} and {@link RegistryManager#ACTIVE}.
+     * @param registryName the name of the registry. Supports lookups on {@link BuiltinRegistries}, {@link Registry}, and {@link RegistryManager#ACTIVE}.
      * @param modid the mod id calling context
      * @return a {@link RegistryObject} that stores the value of an object from a registry once it is ready
      * @see #create(ResourceLocation, ResourceLocation, String)
      * @see #create(ResourceLocation, IForgeRegistry)
      * @see #create(ResourceLocation, ResourceKey, String)
      */
-    public static <T, U extends T> RegistryObject<U> createOptional(final ResourceLocation name, final ResourceLocation registryName, String modid) {
+    public static <T, U extends T> RegistryObject<U> createOptional(final ResourceLocation name, final ResourceLocation registryName, String modid)
+    {
         return new RegistryObject<>(name, registryName, modid, true);
     }
 
@@ -128,46 +208,93 @@ public final class RegistryObject<T> implements Supplier<T> {
 
     private RegistryObject() {
         this.name = null;
-        this.key = null;
         this.optionalRegistry = false;
+    }
+
+    @Deprecated(forRemoval = true, since = "1.18.2")
+    private <V extends IForgeRegistryEntry<V>> RegistryObject(ResourceLocation name, Supplier<Class<? super V>> registryType)
+    {
+        this(name, RegistryManager.ACTIVE.<V>getRegistry(registryType.get()));
     }
 
     @SuppressWarnings("unchecked")
-    private RegistryObject(ResourceLocation name, IForgeRegistry<?> registry) {
+    private <V extends IForgeRegistryEntry<V>> RegistryObject(ResourceLocation name, IForgeRegistry<V> registry)
+    {
         if (registry == null)
             throw new IllegalArgumentException("Invalid registry argument, must not be null");
         this.name = name;
-        this.key = (ResourceKey<T>) ResourceKey.create(registry.getRegistryKey(), name);
         this.optionalRegistry = false;
-        ObjectHolderRegistry.addHandler(pred -> {
+        ObjectHolderRegistry.addHandler(pred ->
+        {
             if (pred.test(registry.getRegistryName()))
                 this.updateReference((IForgeRegistry<? extends T>) registry);
         });
-        this.updateReference((IForgeRegistry<? extends T>) registry);
+        this.updateReference(((IForgeRegistry<? extends T>) registry));
     }
 
-    private RegistryObject(final ResourceLocation name, final ResourceLocation registryName, final String modid, boolean optionalRegistry) {
+    @SuppressWarnings("unchecked")
+    @Deprecated(forRemoval = true, since = "1.18.2")
+    private <V extends IForgeRegistryEntry<V>> RegistryObject(final ResourceLocation name, final Class<V> baseType, final String modid)
+    {
+        this.name = name;
+        this.optionalRegistry = false;
+        final Throwable callerStack = new Throwable("Calling Site from mod: " + modid);
+        ObjectHolderRegistry.addHandler(new Consumer<Predicate<ResourceLocation>>()
+        {
+            private IForgeRegistry<V> registry;
+            private boolean invalidRegistry = false;
+
+            @Override
+            public void accept(Predicate<ResourceLocation> pred)
+            {
+                if (invalidRegistry)
+                    return;
+                if (registry == null)
+                {
+                    this.registry = RegistryManager.ACTIVE.getRegistry(baseType);
+                    if (registry == null)
+                    {
+                        invalidRegistry = true;
+                        throw new IllegalStateException("Unable to find registry for type " + baseType.getName() + " for mod \"" + modid + "\". Check the 'caused by' to see further stack.", callerStack);
+                    }
+                }
+                if (pred.test(registry.getRegistryName()))
+                    RegistryObject.this.updateReference((IForgeRegistry<? extends T>) registry);
+            }
+        });
+        IForgeRegistry<V> registry = RegistryManager.ACTIVE.getRegistry(baseType);
+        // allow registry to be null, this might be for a custom registry that does not exist yet
+        if (registry != null)
+        {
+            this.updateReference(((IForgeRegistry<? extends T>) registry));
+        }
+    }
+
+    private RegistryObject(final ResourceLocation name, final ResourceLocation registryName, final String modid, boolean optionalRegistry)
+    {
         this.name = name;
         this.key = ResourceKey.create(ResourceKey.createRegistryKey(registryName), name);
         this.optionalRegistry = optionalRegistry;
         final Throwable callerStack = new Throwable("Calling Site from mod: " + modid);
-        ObjectHolderRegistry.addHandler(new Consumer<>() {
+        ObjectHolderRegistry.addHandler(new Consumer<>()
+        {
             private boolean registryExists = false;
             private boolean invalidRegistry = false;
 
             @Override
-            public void accept(Predicate<ResourceLocation> pred) {
+            public void accept(Predicate<ResourceLocation> pred)
+            {
                 if (invalidRegistry)
                     return;
-
-                if (!RegistryObject.this.optionalRegistry && !registryExists) {
-                    if (!registryExists(registryName)) {
+                if (!RegistryObject.this.optionalRegistry && !registryExists)
+                {
+                    if (!registryExists(registryName))
+                    {
                         invalidRegistry = true;
                         throw new IllegalStateException("Unable to find registry with key " + registryName + " for mod \"" + modid + "\". Check the 'caused by' to see further stack.", callerStack);
                     }
                     registryExists = true;
                 }
-
                 if (pred.test(registryName))
                     RegistryObject.this.updateReference(registryName);
             }
@@ -187,63 +314,75 @@ public final class RegistryObject<T> implements Supplier<T> {
      */
     @NotNull
     @Override
-    public T get() {
+    public T get()
+    {
         T ret = this.value;
-        if (ret == null)
-            throw new NullPointerException("Registry Object not present: " + this.name);
+        Objects.requireNonNull(ret, () -> "Registry Object not present: " + this.name);
         return ret;
     }
 
     @SuppressWarnings("unchecked")
-    void updateReference(IForgeRegistry<? extends T> registry) {
-        if (this.name == null || this.key == null)
-            return;
-
-        var wrapper = registry instanceof ForgeRegistry forge ? forge.getWrapper() : null;
-        if (registry.containsKey(this.name)) {
-            this.value = registry.getValue(this.name);
-            this.holder = () -> (Holder<T>)registry.getHolder(this.name).orElse(null);
-        } else if (wrapper != null && !wrapper.isIntrusive()) {
-            this.value = null;
-            this.holder = () -> wrapper.createRegistrationLookup().getOrThrow(this.key);
-        } else {
-            this.value = null;
-            this.holder = null;
-        }
-    }
-
-    @SuppressWarnings("unchecked")
-    void updateReference(Registry<? extends T> registry) {
-        if (this.name == null || this.key == null)
-            return;
-
-        var mapped = registry instanceof MappedRegistry m ? m : null;
-        if (registry.containsKey(this.name)) {
-            this.value = registry.getValue(this.name);
-            this.holder = () -> ((Registry<T>)registry).get(this.key).orElse(null);
-        } else if (mapped != null && !mapped.isIntrusive()) {
-            this.value = null;
-            this.holder = () -> mapped.createRegistrationLookup().getOrThrow(this.key);
-        } else {
-            this.value = null;
-            this.holder = null;
-        }
-    }
-
-    @SuppressWarnings("unchecked")
-    void updateReference(ResourceLocation registryName) {
+    @Deprecated(since = "1.18.1") // TODO: make package-private
+    public void updateReference(IForgeRegistry<? extends T> registry)
+    {
         if (this.name == null)
             return;
+        if (registry.containsKey(this.name))
+        {
+            this.value = registry.getValue(this.name);
+            if (this.key == null)
+                this.key = (ResourceKey<T>) ResourceKey.create(registry.getRegistryKey(), this.name);
+            this.holder = (Holder<T>) registry.getHolder(this.name).orElse(null);
+        }
+        else
+        {
+            this.value = null;
+            this.holder = null;
+        }
+    }
 
+    @SuppressWarnings("unchecked")
+    void updateReference(Registry<? extends T> registry)
+    {
+        if (this.name == null)
+            return;
+        if (registry.containsKey(this.name))
+        {
+            this.value = registry.get(this.name);
+            if (this.key == null)
+                this.key = (ResourceKey<T>) ResourceKey.create(registry.key(), this.name);
+            this.holder = ((Registry<T>) registry).getHolder(this.key).orElse(null);
+        }
+        else
+        {
+            this.value = null;
+            this.holder = null;
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    void updateReference(ResourceLocation registryName)
+    {
+        if (this.name == null)
+            return;
         IForgeRegistry<? extends T> forgeRegistry = RegistryManager.ACTIVE.getRegistry(registryName);
-        if (forgeRegistry != null) {
+        if (forgeRegistry != null)
+        {
             updateReference(forgeRegistry);
             return;
         }
 
-        Registry<? extends T> vanillaRegistry = (Registry<? extends T>) BuiltInRegistries.REGISTRY.getValue(registryName);
-        if (vanillaRegistry != null) {
+        Registry<? extends T> vanillaRegistry = (Registry<? extends T>) Registry.REGISTRY.get(registryName);
+        if (vanillaRegistry != null)
+        {
             updateReference(vanillaRegistry);
+            return;
+        }
+
+        Registry<? extends T> builtinRegistry = (Registry<? extends T>) BuiltinRegistries.REGISTRY.get(registryName);
+        if (builtinRegistry != null)
+        {
+            updateReference(builtinRegistry);
             return;
         }
 
@@ -251,37 +390,27 @@ public final class RegistryObject<T> implements Supplier<T> {
         this.holder = null;
     }
 
-    void updateReference(RegisterEvent event) {
-        IForgeRegistry<? extends T> forgeRegistry = event.getForgeRegistry();
-        if (forgeRegistry != null) {
-            updateReference(forgeRegistry);
-            return;
-        }
-
-        Registry<? extends T> vanillaRegistry = event.getVanillaRegistry();
-        if (vanillaRegistry != null)
-            updateReference(vanillaRegistry);
-        else
-            this.value = null;
-    }
-
-    private static boolean registryExists(ResourceLocation registryName) {
+    private static boolean registryExists(ResourceLocation registryName)
+    {
         return RegistryManager.ACTIVE.getRegistry(registryName) != null
-                || BuiltInRegistries.REGISTRY.containsKey(registryName);
+                || Registry.REGISTRY.containsKey(registryName)
+                || BuiltinRegistries.REGISTRY.containsKey(registryName);
     }
 
-    public ResourceLocation getId() {
+    public ResourceLocation getId()
+    {
         return this.name;
     }
 
     /**
      * Returns the resource key that points to the registry and name of this registry object.
-     * Nullable only if this RegistryObject is empty and has no name.
+     * Nullable only when the deprecated factories {@link #of(ResourceLocation, Class, String)} or {@link #of(ResourceLocation, Supplier)} are used.
      *
      * @return the resource key that points to the registry and name of this registry object
      */
     @Nullable
-    public ResourceKey<T> getKey() {
+    public ResourceKey<T> getKey()
+    {
         return this.key;
     }
 
@@ -455,26 +584,44 @@ public final class RegistryObject<T> implements Supplier<T> {
      * This should <b>only</b> be used in cases where vanilla code requires passing in a Holder.
      * Mod-written code should rely on RegistryObjects or Suppliers instead.
      * <p>
-     * The returned optional will be empty if the registry does not exist or if {@link #isPresent() returns false}.
+     * The returned optional will be empty if the registry does not exist
+     * or if the deprecated factories {@link #of(ResourceLocation, Class, String)}
+     * or {@link #of(ResourceLocation, Supplier)} are used.
+     * Otherwise, the optional Holder will be present even if {@link #isPresent()} returns false.
      *
      * @return an optional {@link Holder} instance pointing to this RegistryObject's name and value
      */
+    @SuppressWarnings("unchecked")
     @NotNull
-    public Optional<Holder<T>> getHolder() {
-        return Optional.ofNullable(this.holder == null ? null : this.holder.get());
+    public Optional<Holder<T>> getHolder()
+    {
+        if (this.holder == null && this.key != null && registryExists(this.key.registry()))
+        {
+            ResourceLocation registryName = this.key.registry();
+            Registry<T> registry = (Registry<T>) Registry.REGISTRY.get(registryName);
+            if (registry == null)
+                registry = (Registry<T>) BuiltinRegistries.REGISTRY.get(registryName);
+
+            if (registry != null)
+                this.holder = registry.getOrCreateHolder(this.key);
+        }
+
+        return Optional.ofNullable(this.holder);
     }
 
     @Override
-    public boolean equals(Object obj) {
+    public boolean equals(Object obj)
+    {
         if (this == obj) return true;
-        if (obj instanceof RegistryObject o) {
-            return Objects.equals(o.name, name);
+        if (obj instanceof RegistryObject) {
+            return Objects.equals(((RegistryObject<?>)obj).name, name);
         }
         return false;
     }
 
     @Override
-    public int hashCode() {
+    public int hashCode()
+    {
         return Objects.hashCode(name);
     }
 }

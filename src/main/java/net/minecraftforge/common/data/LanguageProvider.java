@@ -1,35 +1,44 @@
 /*
- * Copyright (c) Forge Development LLC and contributors
+ * Minecraft Forge - Forge Development LLC
  * SPDX-License-Identifier: LGPL-2.1-only
  */
 
 package net.minecraftforge.common.data;
 
-import com.google.gson.JsonObject;
+import java.io.BufferedWriter;
+import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Map;
+import java.util.Objects;
 import java.util.TreeMap;
-import java.util.concurrent.CompletableFuture;
 import java.util.function.Supplier;
-import net.minecraft.data.CachedOutput;
+
+import org.apache.commons.lang3.text.translate.JavaUnicodeEscaper;
+
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+
+import net.minecraft.world.level.block.Block;
+import net.minecraft.data.DataGenerator;
+import net.minecraft.data.HashCache;
 import net.minecraft.data.DataProvider;
-import net.minecraft.data.PackOutput;
-import net.minecraft.network.chat.contents.TranslatableContents;
-import net.minecraft.world.effect.MobEffect;
+import net.minecraft.world.item.enchantment.Enchantment;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.enchantment.Enchantment;
-import net.minecraft.world.level.block.Block;
+import net.minecraft.world.effect.MobEffect;
 
+@SuppressWarnings("deprecation")
 public abstract class LanguageProvider implements DataProvider {
+    private static final Gson GSON = (new GsonBuilder()).setPrettyPrinting().disableHtmlEscaping().create();
     private final Map<String, String> data = new TreeMap<>();
-    private final PackOutput output;
+    private final DataGenerator gen;
     private final String modid;
     private final String locale;
 
-    public LanguageProvider(PackOutput output, String modid, String locale) {
-        this.output = output;
+    public LanguageProvider(DataGenerator gen, String modid, String locale) {
+        this.gen = gen;
         this.modid = modid;
         this.locale = locale;
     }
@@ -37,13 +46,10 @@ public abstract class LanguageProvider implements DataProvider {
     protected abstract void addTranslations();
 
     @Override
-    public CompletableFuture<?> run(CachedOutput cache) {
+    public void run(HashCache cache) throws IOException {
         addTranslations();
-
         if (!data.isEmpty())
-            return save(cache, this.output.getOutputFolder(PackOutput.Target.RESOURCE_PACK).resolve(this.modid).resolve("lang").resolve(this.locale + ".json"));
-
-        return CompletableFuture.allOf();
+            save(cache, data, this.gen.getOutputFolder().resolve("assets/" + modid + "/lang/" + locale + ".json"));
     }
 
     @Override
@@ -51,12 +57,19 @@ public abstract class LanguageProvider implements DataProvider {
         return "Languages: " + locale;
     }
 
-    private CompletableFuture<?> save(CachedOutput cache, Path target) {
-        // TODO: DataProvider.saveStable handles the caching and hashing already, but creating the JSON Object this way seems unreliable. -C
-        JsonObject json = new JsonObject();
-        this.data.forEach(json::addProperty);
+    private void save(HashCache cache, Object object, Path target) throws IOException {
+        String data = GSON.toJson(object);
+        data = JavaUnicodeEscaper.outsideOf(0, 0x7f).translate(data); // Escape unicode after the fact so that it's not double escaped by GSON
+        String hash = DataProvider.SHA1.hashUnencodedChars(data).toString();
+        if (!Objects.equals(cache.getHash(target), hash) || !Files.exists(target)) {
+           Files.createDirectories(target.getParent());
 
-        return DataProvider.saveStable(cache, json, target);
+           try (BufferedWriter bufferedwriter = Files.newBufferedWriter(target)) {
+              bufferedwriter.write(data);
+           }
+        }
+
+        cache.putNew(target, hash);
     }
 
     public void addBlock(Supplier<? extends Block> key, String name) {
@@ -80,7 +93,7 @@ public abstract class LanguageProvider implements DataProvider {
     }
 
     public void add(ItemStack key, String name) {
-        add(key.getItem().getDescriptionId(), name);
+        add(key.getDescriptionId(), name);
     }
 
     public void addEnchantment(Supplier<? extends Enchantment> key, String name) {
@@ -88,10 +101,7 @@ public abstract class LanguageProvider implements DataProvider {
     }
 
     public void add(Enchantment key, String name) {
-        if (!(key.description().getContents() instanceof TranslatableContents description))
-            throw new IllegalArgumentException("Enchantment " + key + " does not have a translatable name");
-
-        add(description.getKey(), name);
+        add(key.getDescriptionId(), name);
     }
 
     /*

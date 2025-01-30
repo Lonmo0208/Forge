@@ -1,74 +1,61 @@
 /*
- * Copyright (c) Forge Development LLC and contributors
+ * Minecraft Forge - Forge Development LLC
  * SPDX-License-Identifier: LGPL-2.1-only
  */
 
 package net.minecraftforge.client.event;
-
-import com.mojang.blaze3d.platform.InputConstants;
-import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.components.events.GuiEventListener;
-import net.minecraft.client.gui.screens.Screen;
-import net.minecraftforge.common.MinecraftForge;
-import net.minecraftforge.eventbus.api.Cancelable;
-import net.minecraftforge.eventbus.api.Event;
-import net.minecraftforge.fml.LogicalSide;
-import org.jetbrains.annotations.ApiStatus;
-import org.jetbrains.annotations.Nullable;
-import org.lwjgl.glfw.GLFW;
 
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Consumer;
 
+import com.mojang.blaze3d.vertex.PoseStack;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.components.events.GuiEventListener;
+import net.minecraft.client.gui.screens.inventory.EffectRenderingInventoryScreen;
+import net.minecraftforge.api.distmarker.Dist;
+import net.minecraftforge.api.distmarker.OnlyIn;
+import net.minecraft.client.gui.screens.Screen;
+
+import net.minecraftforge.common.MinecraftForge;
+import net.minecraftforge.eventbus.api.Cancelable;
+import net.minecraftforge.eventbus.api.Event;
+import net.minecraftforge.fml.LogicalSide;
+import org.lwjgl.glfw.GLFW;
+
 /**
- * Fired on different events/actions when a {@link Screen} is active and visible.
- * See the various subclasses for listening to different events.
+ * Event classes for GuiScreen events.
  *
- * <p>These events are fired on the {@linkplain MinecraftForge#EVENT_BUS main Forge event bus},
- * only on the {@linkplain LogicalSide#CLIENT logical client}.</p>
- *
- * @see Init
- * @see Render
- * @see BackgroundRendered
- * @see MouseInput
- * @see KeyInput
+ * @author bspkrs
  */
-public abstract class ScreenEvent extends Event {
+@OnlyIn(Dist.CLIENT)
+public class ScreenEvent extends Event
+{
     private final Screen screen;
 
-    @ApiStatus.Internal
-    protected ScreenEvent(Screen screen) {
+    public ScreenEvent(Screen screen)
+    {
         this.screen = Objects.requireNonNull(screen);
     }
 
     /**
-     * {@return the screen that caused this event}
+     * The GuiScreen object generating this event.
      */
-    public Screen getScreen() {
+    public Screen getScreen()
+    {
         return screen;
     }
 
-    /**
-     * Fired when a screen is being initialized.
-     * See the two subclasses for listening before and after the initialization.
-     *
-     * <p>Listeners added through this event may also be marked as renderable or narratable, if they inherit from
-     * {@link net.minecraft.client.gui.components.Renderable} and {@link net.minecraft.client.gui.narration.NarratableEntry}
-     * respectively.</p>
-     *
-     * @see Init.Pre
-     * @see Init.Post
-     */
-    public static abstract class Init extends ScreenEvent {
-        private final Consumer<GuiEventListener> add;
-        private final Consumer<GuiEventListener> remove;
+    public static class InitScreenEvent extends ScreenEvent
+    {
+        private Consumer<GuiEventListener> add;
+        private Consumer<GuiEventListener> remove;
 
-        private final List<GuiEventListener> listenerList;
+        private List<GuiEventListener> listenerList;
 
-        @ApiStatus.Internal
-        protected Init(Screen screen, List<GuiEventListener> listenerList, Consumer<GuiEventListener> add, Consumer<GuiEventListener> remove) {
+        public InitScreenEvent(Screen screen, List<GuiEventListener> listenerList, Consumer<GuiEventListener> add, Consumer<GuiEventListener> remove)
+        {
             super(screen);
             this.listenerList = Collections.unmodifiableList(listenerList);
             this.add = add;
@@ -76,419 +63,329 @@ public abstract class ScreenEvent extends Event {
         }
 
         /**
-         * {@return unmodifiable view of list of event listeners on the screen}
+         * Unmodifiable reference to the list of buttons on the {@link #screen}.
          */
-        public List<GuiEventListener> getListenersList() {
+        public List<GuiEventListener> getListenersList()
+        {
             return listenerList;
         }
 
-        /**
-         * Adds the given {@link GuiEventListener} to the screen.
-         *
-         * @param listener the listener to add
-         */
-        public void addListener(GuiEventListener listener) {
-            add.accept(listener);
+        public void addListener(GuiEventListener button)
+        {
+            add.accept(button);
+        }
+
+        public void removeListener(GuiEventListener button)
+        {
+            remove.accept(button);
         }
 
         /**
-         * Removes the given {@link GuiEventListener} from the screen.
+         * This event fires just after initializing the {@link Minecraft}, font renderer, width,
+         * and height fields.<br/><br/>
          *
-         * @param listener the listener to remove
-         */
-        public void removeListener(GuiEventListener listener) {
-            remove.accept(listener);
-        }
-
-        /**
-         * Fired <b>before</b> the screen's overridable initialization method is fired.
-         *
-         * <p>This event is {@linkplain Cancelable cancellable}, and does not {@linkplain HasResult have a result}.
-         * If the event is cancelled, the initialization method will not be called, and the widgets and children lists
-         * will not be cleared.</p>
-         *
-         * <p>This event is fired on the {@linkplain MinecraftForge#EVENT_BUS main Forge event bus},
-         * only on the {@linkplain LogicalSide#CLIENT logical client}.</p>
+         * If canceled the following lines are skipped in {@link Screen#init(Minecraft, int, int)}:<br/>
+         * {@code this.buttonList.clear();}<br/>
+         * {@code this.children.clear();}<br/>
+         * {@code this.initGui();}<br/>
          */
         @Cancelable
-        public static class Pre extends Init {
-            @ApiStatus.Internal
-            public Pre(Screen screen, List<GuiEventListener> list, Consumer<GuiEventListener> add, Consumer<GuiEventListener> remove) {
+        public static class Pre extends InitScreenEvent
+        {
+            public Pre(Screen screen, List<GuiEventListener> list, Consumer<GuiEventListener> add, Consumer<GuiEventListener> remove)
+            {
                 super(screen, list, add, remove);
             }
         }
 
         /**
-         * Fired <b>after</b> the screen's overridable initialization method is called.
-         *
-         * <p>This event is not {@linkplain Cancelable cancellable}, and does not {@linkplain HasResult have a result}.</p>
-         *
-         * <p>This event is fired on the {@linkplain MinecraftForge#EVENT_BUS main Forge event bus},
-         * only on the {@linkplain LogicalSide#CLIENT logical client}.</p>
+         * This event fires right after {@code Screen#init()}.
+         * This is a good place to alter a GuiScreen's component layout if desired.
          */
-        public static class Post extends Init {
-            @ApiStatus.Internal
-            public Post(Screen screen, List<GuiEventListener> list, Consumer<GuiEventListener> add, Consumer<GuiEventListener> remove) {
+        public static class Post extends InitScreenEvent
+        {
+            public Post(Screen screen, List<GuiEventListener> list, Consumer<GuiEventListener> add, Consumer<GuiEventListener> remove)
+            {
                 super(screen, list, add, remove);
             }
         }
     }
 
-    /**
-     * Fired when a screen is being drawn.
-     * See the two subclasses for listening before and after drawing.
-     *
-     * @see Render.Pre
-     * @see Render.Post
-     */
-    public static abstract class Render extends ScreenEvent {
-        private final GuiGraphics guiGraphics;
+    public static class DrawScreenEvent extends ScreenEvent
+    {
+        private final PoseStack poseStack;
         private final int mouseX;
         private final int mouseY;
-        private final float partialTick;
+        private final float partialTicks;
 
-        @ApiStatus.Internal
-        protected Render(Screen screen, GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
+        public DrawScreenEvent(Screen screen, PoseStack poseStack, int mouseX, int mouseY, float partialTicks)
+        {
             super(screen);
-            this.guiGraphics = guiGraphics;
+            this.poseStack = poseStack;
             this.mouseX = mouseX;
             this.mouseY = mouseY;
-            this.partialTick = partialTick;
+            this.partialTicks = partialTicks;
         }
 
         /**
-         * {@return the gui graphics used for rendering}
+         * The PoseStack to render with.
          */
-        public GuiGraphics getGuiGraphics() {
-            return guiGraphics;
+        public PoseStack getPoseStack()
+        {
+            return poseStack;
         }
 
         /**
-         * {@return the X coordinate of the mouse pointer}
+         * The x coordinate of the mouse pointer on the screen.
          */
-        public int getMouseX() {
+        public int getMouseX()
+        {
             return mouseX;
         }
 
         /**
-         * {@return the Y coordinate of the mouse pointer}
+         * The y coordinate of the mouse pointer on the screen.
          */
-        public int getMouseY() {
+        public int getMouseY()
+        {
             return mouseY;
         }
 
         /**
-         * {@return the partial tick}
+         * Partial render ticks elapsed.
          */
-        public float getPartialTick() {
-            return partialTick;
+        public float getPartialTicks()
+        {
+            return partialTicks;
         }
 
         /**
-         * Fired <b>before</b> the screen is drawn.
-         *
-         * <p>This event is {@linkplain Cancelable cancellable}, and does not {@linkplain HasResult have a result}.
-         * If the event is cancelled, the screen will not be drawn.</p>
-         *
-         * <p>This event is fired on the {@linkplain MinecraftForge#EVENT_BUS main Forge event bus},
-         * only on the {@linkplain LogicalSide#CLIENT logical client}.</p>
+         * This event fires just before {@link Screen#render(PoseStack, int, int, float)} is called.
+         * Cancel this event to skip the render method.
          */
         @Cancelable
-        public static class Pre extends Render {
-            @ApiStatus.Internal
-            public Pre(Screen screen, GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
-                super(screen, guiGraphics, mouseX, mouseY, partialTick);
+        public static class Pre extends DrawScreenEvent
+        {
+            public Pre(Screen screen, PoseStack poseStack, int mouseX, int mouseY, float partialTick)
+            {
+                super(screen, poseStack, mouseX, mouseY, partialTick);
             }
         }
 
         /**
-         * Fired <b>after</b> the screen is drawn.
-         *
-         * <p>This event is not {@linkplain Cancelable cancellable}, and does not {@linkplain HasResult have a result}.</p>
-         *
-         * <p>This event is fired on the {@linkplain MinecraftForge#EVENT_BUS main Forge event bus},
-         * only on the {@linkplain LogicalSide#CLIENT logical client}.</p>
+         * This event fires just after {@link Screen#render(PoseStack, int, int, float)} is called.
          */
-        public static class Post extends Render {
-            @ApiStatus.Internal
-            public Post(Screen screen, GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
-                super(screen, guiGraphics, mouseX, mouseY, partialTick);
+        public static class Post extends DrawScreenEvent
+        {
+            public Post(Screen screen, PoseStack poseStack, int mouseX, int mouseY, float partialTick)
+            {
+                super(screen, poseStack, mouseX, mouseY, partialTick);
             }
         }
     }
 
     /**
-     * Fired directly after the background of the screen is drawn.
-     * Can be used for drawing above the background but below the tooltips.
-     *
-     * <p>This event is not {@linkplain Cancelable cancellable}, and does not {@linkplain HasResult have a result}.</p>
-     *
-     * <p>This event is fired on the {@linkplain MinecraftForge#EVENT_BUS main Forge event bus},
-     * only on the {@linkplain LogicalSide#CLIENT logical client}.</p>
+     * This event fires at the end of {@link Screen#renderBackground(PoseStack, int)} and before the rest of the Gui draws.
+     * This allows drawing next to Guis, above the background but below any tooltips.
      */
-    public static class BackgroundRendered extends ScreenEvent {
-        private final GuiGraphics guiGraphics;
+    public static class BackgroundDrawnEvent extends ScreenEvent
+    {
+        private final PoseStack poseStack;
 
-        @ApiStatus.Internal
-        public BackgroundRendered(Screen screen, GuiGraphics guiGraphics) {
+        public BackgroundDrawnEvent(Screen screen, PoseStack poseStack)
+        {
             super(screen);
-            this.guiGraphics = guiGraphics;
+            this.poseStack = poseStack;
         }
 
         /**
-         * {@return the gui graphics used for rendering}
+         * The PoseStack to render with.
          */
-        public GuiGraphics getGuiGraphics() {
-            return guiGraphics;
+        public PoseStack getPoseStack()
+        {
+            return poseStack;
         }
     }
 
     /**
-     * Fired ahead of rendering any active mob effects in the {@link EffectsInInventory inventory screen}.
-     * Can be used to select the size of the effects display (full or compact) or even hide or replace vanilla's rendering entirely.
-     * This event can also be used to modify the horizontal position of the stack of effects being rendered.
+     * This event fires in {@link EffectRenderingInventoryScreen} in the
+     * {@code checkEffectRendering} method when potion effects are active and the gui wants to move over.
+     * Cancel this event to prevent the Gui from being moved.
      *
-     * <p>This event is {@linkplain Cancelable cancellable} and does not {@linkplain HasResult have a result}.
-     * Cancelling this event will prevent vanilla rendering.</p>
-     *
-     * <p>This event is fired on the {@linkplain MinecraftForge#EVENT_BUS main Forge event bus},
-     * only on the {@linkplain LogicalSide#CLIENT logical client}.</p>
+     * @deprecated This event was made redundant by the removal of the screen shifting due to potion indicators in the
+     * inventory screen (along with being moved to the right hand side). This has been changed to have no effect, and
+     * will be removed in 1.19. See {@link PotionSizeEvent} as a possible alternative instead.
      */
+    @Deprecated(forRemoval = true, since = "1.18.1")
     @Cancelable
-    public static class RenderInventoryMobEffects extends ScreenEvent {
-        private final int availableSpace;
-        private boolean compact;
-        private int horizontalOffset;
-
-        @ApiStatus.Internal
-        public RenderInventoryMobEffects(Screen screen, int availableSpace, boolean compact, int horizontalOffset) {
+    public static class PotionShiftEvent extends ScreenEvent
+    {
+        public PotionShiftEvent(Screen screen)
+        {
             super(screen);
-            this.availableSpace = availableSpace;
-            this.compact = compact;
-            this.horizontalOffset = horizontalOffset;
-        }
-
-        /**
-         * The available space to the right of the inventory.
-         */
-        public int getAvailableSpace() {
-            return availableSpace;
-        }
-
-        /**
-         * Whether the effects should be rendered in compact mode (only icons, no text), or the default full size.
-         */
-        public boolean isCompact() {
-            return compact;
-        }
-
-        /**
-         * The distance from the left side of the screen that the effect stack is rendered. Positive values shift this more to the right.
-         */
-        public int getHorizontalOffset() {
-            return horizontalOffset;
-        }
-
-        /**
-         * Replaces the horizontal offset of the effect stack
-         */
-        public void setHorizontalOffset(int offset) {
-            horizontalOffset = offset;
-        }
-
-        /**
-         * Adds to the horizontal offset of the effect stack. Negative values are acceptable.
-         */
-        public void addHorizontalOffset(int offset) {
-            horizontalOffset += offset;
-        }
-
-        /**
-         * Sets whether the effects should be rendered in compact mode (only icons, no text), or the default full size.
-         */
-        public void setCompact(boolean compact) {
-            this.compact = compact;
         }
     }
 
     /**
-     * Fired whenever an action is performed by the mouse.
-     * See the various subclasses to listen for different actions.
+     * Fired to determine whether to render the potion indicators in the {@link EffectRenderingInventoryScreen inventory
+     * screen} in compact or classic mode.
      *
-     * @see MouseButtonPressed
-     * @see MouseButtonReleased
-     * @see MouseDragged
-     * @see MouseScrolled
+     * <p>This event is not {@linkplain Cancelable cancelable} and {@linkplain HasResult has a result}. </p>
+     * <ul>
+     *   <li>{@link Result#ALLOW} - forcibly renders the potion indicators in <em>compact</em> mode.</li>
+     *   <li>{@link Result#DEFAULT} - defaults to vanilla behavior to using compact mode if the the screen width is too
+     *   small for classic rendering of potion indicators.</li>
+     *   <li>{@link Result#DENY} - forcibly renders the potion indicators in <em>classic</em> mode.</li>
+     * </ul>
+     *
+     * <p>This event is fired on the {@linkplain MinecraftForge#EVENT_BUS main Forge event bus},
+     * only on the {@linkplain LogicalSide#CLIENT logical client}. </p>
      */
-    private static abstract class MouseInput extends ScreenEvent {
+    @HasResult
+    public static class PotionSizeEvent extends ScreenEvent
+    {
+        /**
+         * @hidden For internal use only.
+         */
+        public PotionSizeEvent(Screen screen)
+        {
+            super(screen);
+        }
+    }
+
+    public static abstract class MouseInputEvent extends ScreenEvent
+    {
         private final double mouseX;
         private final double mouseY;
 
-        @ApiStatus.Internal
-        protected MouseInput(Screen screen, double mouseX, double mouseY) {
+        public MouseInputEvent(Screen screen, double mouseX, double mouseY)
+        {
             super(screen);
             this.mouseX = mouseX;
             this.mouseY = mouseY;
         }
 
-        /**
-         * {@return the X position of the mouse cursor, relative to the screen}
-         */
-        public double getMouseX() {
+        public double getMouseX()
+        {
             return mouseX;
         }
 
-        /**
-         * {@return the Y position of the mouse cursor, relative to the screen}
-         */
-        public double getMouseY() {
+        public double getMouseY()
+        {
             return mouseY;
         }
     }
 
-    /**
-     * Fired when a mouse button is pressed.
-     * See the two subclasses for listening before and after the normal handling.
-     *
-     * @see MouseButtonPressed.Pre
-     * @see MouseButtonPressed.Post
-     */
-    public static abstract class MouseButtonPressed extends MouseInput {
+    public static abstract class MouseClickedEvent extends MouseInputEvent
+    {
         private final int button;
 
-        @ApiStatus.Internal
-        public MouseButtonPressed(Screen screen, double mouseX, double mouseY, int button) {
+        public MouseClickedEvent(Screen screen, double mouseX, double mouseY, int button)
+        {
             super(screen, mouseX, mouseY);
             this.button = button;
         }
 
-        /**
-         * {@return the mouse button's input code}
-         *
-         * @see GLFW mouse constants starting with 'GLFW_MOUSE_BUTTON_'
-         * @see <a href="https://www.glfw.org/docs/latest/group__buttons.html" target="_top">the online GLFW documentation</a>
-         */
-        public int getButton() {
+        public int getButton()
+        {
             return button;
         }
 
         /**
-         * Fired <b>before</b> the mouse click is handled by the screen.
-         *
-         * <p>This event is {@linkplain Cancelable cancellable}, and does not {@linkplain HasResult have a result}.
-         * If the event is cancelled, the screen's mouse click handler will be bypassed
-         * and the corresponding {@link MouseButtonPressed.Post} will not be fired.</p>
-         *
-         * <p>This event is fired on the {@linkplain MinecraftForge#EVENT_BUS main Forge event bus},
-         * only on the {@linkplain LogicalSide#CLIENT logical client}.</p>
+         * This event fires when a mouse click is detected for a GuiScreen, before it is handled.
+         * Cancel this event to bypass {@link GuiEventListener#mouseClicked(double, double, int)}.
          */
         @Cancelable
-        public static class Pre extends MouseButtonPressed {
-            @ApiStatus.Internal
-            public Pre(Screen screen, double mouseX, double mouseY, int button) {
+        public static class Pre extends MouseClickedEvent
+        {
+            public Pre(Screen screen, double mouseX, double mouseY, int button)
+            {
                 super(screen, mouseX, mouseY, button);
             }
         }
 
         /**
-         * Fired <b>after</b> the mouse click is handled, if the corresponding {@link MouseButtonPressed.Pre} was not
-         * cancelled.
+         * This event fires after {@link GuiEventListener#mouseClicked(double, double, int)}.
          *
-         * <p>This event is not {@linkplain Cancelable cancellable}, {@linkplain HasResult has a result}.</p>
+         * <p>This event {@linkplain HasResult has a result}.<br>
          * <ul>
-         *   <li>{@link Result#ALLOW} - forcibly sets the mouse click as handled</li>
-         *   <li>{@link Result#DEFAULT} - defaults to the return value of
-         *   {@link Screen#mouseClicked(double, double, int)} from the screen (see {@link #wasHandled()}.</li>
-         *   <li>{@link Result#DENY} - forcibly sets the mouse click as not handled.</li>
+         *   <li><b>{@link Result#ALLOW}</b> - to force set the mouse click as handled</li>
+         *   <li><b>{@link Result#DEFAULT}</b> - to use the default value of {@link #handled}</li>
+         *   <li><b>{@link Result#DENY}</b> - to force set the mouse click as not handled</li>
          * </ul>
+         * </p>
          *
-         * <p>This event is fired on the {@linkplain MinecraftForge#EVENT_BUS main Forge event bus},
-         * only on the {@linkplain LogicalSide#CLIENT logical client}.</p>
+         * <p>Note that this event is currently pre-cancelled if {@link Screen#mouseClicked} returns {@code true}
+         * to retain old behavior. This will be changed in 1.18 when the event is made non-cancellable.</p>
          */
         @HasResult
-        public static class Post extends MouseButtonPressed {
+        public static class Post extends MouseClickedEvent
+        {
             private final boolean handled;
 
-            @ApiStatus.Internal
-            public Post(Screen screen, double mouseX, double mouseY, int button, boolean handled) {
+            public Post(Screen screen, double mouseX, double mouseY, int button, boolean handled)
+            {
                 super(screen, mouseX, mouseY, button);
                 this.handled = handled;
             }
 
             /**
-             * {@return {@code true} if the mouse click was already handled by its screen}
+             * @return {@code true} if the mouse click was already handled by its screen
              */
-            public boolean wasHandled() {
+            public boolean wasHandled()
+            {
                 return handled;
             }
         }
     }
 
-    /**
-     * Fired when a mouse button is released.
-     * See the two subclasses for listening before and after the normal handling.
-     *
-     * @see MouseButtonReleased.Pre
-     * @see MouseButtonReleased.Post
-     */
-    public static abstract class MouseButtonReleased extends MouseInput {
+    public static abstract class MouseReleasedEvent extends MouseInputEvent
+    {
         private final int button;
 
-        @ApiStatus.Internal
-        public MouseButtonReleased(Screen screen, double mouseX, double mouseY, int button) {
+        public MouseReleasedEvent(Screen screen, double mouseX, double mouseY, int button)
+        {
             super(screen, mouseX, mouseY);
             this.button = button;
         }
 
-        /**
-         * {@return the mouse button's input code}
-         *
-         * @see GLFW mouse constants starting with 'GLFW_MOUSE_BUTTON_'
-         * @see <a href="https://www.glfw.org/docs/latest/group__buttons.html" target="_top">the online GLFW documentation</a>
-         */
-        public int getButton() {
+        public int getButton()
+        {
             return button;
         }
 
         /**
-         * Fired <b>before</b> the mouse release is handled by the screen.
-         *
-         * <p>This event is {@linkplain Cancelable cancellable}, and does not {@linkplain HasResult have a result}.
-         * If the event is cancelled, the screen's mouse release handler will be bypassed
-         * and the corresponding {@link MouseButtonReleased.Post} will not be fired.</p>
-         *
-         * <p>This event is fired on the {@linkplain MinecraftForge#EVENT_BUS main Forge event bus},
-         * only on the {@linkplain LogicalSide#CLIENT logical client}.</p>
+         * This event fires when a mouse release is detected for a GuiScreen, before it is handled.
+         * Cancel this event to bypass {@link GuiEventListener#mouseReleased(double, double, int)}.
          */
         @Cancelable
-        public static class Pre extends MouseButtonReleased {
-            @ApiStatus.Internal
-            public Pre(Screen screen, double mouseX, double mouseY, int button) {
+        public static class Pre extends MouseReleasedEvent
+        {
+            public Pre(Screen screen, double mouseX, double mouseY, int button)
+            {
                 super(screen, mouseX, mouseY, button);
             }
         }
 
         /**
-         * Fired <b>after</b> the mouse release is handled, if the corresponding {@link MouseButtonReleased.Pre} was
-         * not cancelled.
+         * This event fires after {@link GuiEventListener#mouseReleased(double, double, int)}.
          *
-         * <p>This event is not {@linkplain Cancelable cancellable}, {@linkplain HasResult has a result}.</p>
+         * <p>This event {@linkplain HasResult has a result}.<br>
          * <ul>
-         *   <li>{@link Result#ALLOW} - forcibly sets the mouse release as handled</li>
-         *   <li>{@link Result#DEFAULT} - defaults to the return value of
-         *   {@link Screen#mouseReleased(double, double, int)} from the screen (see {@link #wasHandled()}.</li>
-         *   <li>{@link Result#DENY} - forcibly sets the mouse release as not handled.</li>
+         *   <li><b>{@link Result#ALLOW}</b> - to force set the mouse release as handled</li>
+         *   <li><b>{@link Result#DEFAULT}</b> - to use the default value of {@link #handled}</li>
+         *   <li><b>{@link Result#DENY}</b> - to force set the mouse release as not handled</li>
          * </ul>
+         * </p>
          *
-         * <p>This event is fired on the {@linkplain MinecraftForge#EVENT_BUS main Forge event bus},
-         * only on the {@linkplain LogicalSide#CLIENT logical client}.</p>
          */
         @HasResult
-        public static class Post extends MouseButtonReleased {
+        public static class Post extends MouseReleasedEvent
+        {
             private final boolean handled;
 
-            @ApiStatus.Internal
-            public Post(Screen screen, double mouseX, double mouseY, int button, boolean handled) {
+            public Post(Screen screen, double mouseX, double mouseY, int button, boolean handled)
+            {
                 super(screen, mouseX, mouseY, button);
                 this.handled = handled;
             }
@@ -496,176 +393,119 @@ public abstract class ScreenEvent extends Event {
             /**
              * @return {@code true} if the mouse release was already handled by its screen
              */
-            public boolean wasHandled() {
+            public boolean wasHandled()
+            {
                 return handled;
             }
         }
     }
 
-    /**
-     * Fired when the mouse was dragged while a button is being held down.
-     * See the two subclasses for listening before and after the normal handling.
-     *
-     * @see MouseDragged.Pre
-     * @see MouseDragged.Post
-     */
-    public static abstract class MouseDragged extends MouseInput {
+    public static abstract class MouseDragEvent extends MouseInputEvent
+    {
         private final int mouseButton;
         private final double dragX;
         private final double dragY;
 
-        @ApiStatus.Internal
-        public MouseDragged(Screen screen, double mouseX, double mouseY, int mouseButton, double dragX, double dragY) {
+        public MouseDragEvent(Screen screen, double mouseX, double mouseY, int mouseButton, double dragX, double dragY)
+        {
             super(screen, mouseX, mouseY);
             this.mouseButton = mouseButton;
             this.dragX = dragX;
             this.dragY = dragY;
         }
 
-        /**
-         * {@return the mouse button's input code}
-         *
-         * @see GLFW mouse constants starting with 'GLFW_MOUSE_BUTTON_'
-         * @see <a href="https://www.glfw.org/docs/latest/group__buttons.html" target="_top">the online GLFW documentation</a>
-         */
-        public int getMouseButton() {
+        public int getMouseButton()
+        {
             return mouseButton;
         }
 
-        /**
-         * {@return amount of mouse drag along the X axis}
-         */
-        public double getDragX() {
+        public double getDragX()
+        {
             return dragX;
         }
 
-        /**
-         * {@return amount of mouse drag along the Y axis}
-         */
-        public double getDragY() {
+        public double getDragY()
+        {
             return dragY;
         }
 
         /**
-         * Fired <b>before</b> the mouse drag is handled by the screen.
-         *
-         * <p>This event is {@linkplain Cancelable cancellable}, and does not {@linkplain HasResult have a result}.
-         * If the event is cancelled, the screen's mouse drag handler will be bypassed
-         * and the corresponding {@link MouseDragged.Post} will not be fired.</p>
-         *
-         * <p>This event is fired on the {@linkplain MinecraftForge#EVENT_BUS main Forge event bus},
-         * only on the {@linkplain LogicalSide#CLIENT logical client}.</p>
+         * This event fires when a mouse drag is detected for a GuiScreen, before it is handled.
+         * Cancel this event to bypass {@link GuiEventListener#mouseDragged(double, double, int, double, double)}.
          */
         @Cancelable
-        public static class Pre extends MouseDragged {
-            @ApiStatus.Internal
-            public Pre(Screen screen, double mouseX, double mouseY, int mouseButton, double dragX, double dragY) {
+        public static class Pre extends MouseDragEvent
+        {
+            public Pre(Screen screen, double mouseX, double mouseY, int mouseButton, double dragX, double dragY)
+            {
                 super(screen, mouseX, mouseY, mouseButton, dragX, dragY);
             }
         }
 
         /**
-         * Fired <b>after</b> the mouse drag is handled, if not handled by the screen
-         * and the corresponding {@link MouseDragged.Pre} is not cancelled.
-         *
-         * <p>This event is not {@linkplain Cancelable cancellable}, and does not {@linkplain HasResult have a result}.
-         * If the event is cancelled, the mouse drag will be set as handled.</p>
-         *
-         * <p>This event is fired on the {@linkplain MinecraftForge#EVENT_BUS main Forge event bus},
-         * only on the {@linkplain LogicalSide#CLIENT logical client}.</p>
+         * This event fires after {@link GuiEventListener#mouseDragged(double, double, int, double, double)} if the drag was not already handled.
+         * Cancel this event when you successfully use the mouse drag, to prevent other handlers from using the same input.
          */
-        public static class Post extends MouseDragged {
-            @ApiStatus.Internal
-            public Post(Screen screen, double mouseX, double mouseY, int mouseButton, double dragX, double dragY) {
+        @Cancelable
+        public static class Post extends MouseDragEvent
+        {
+            public Post(Screen screen, double mouseX, double mouseY, int mouseButton, double dragX, double dragY)
+            {
                 super(screen, mouseX, mouseY, mouseButton, dragX, dragY);
             }
         }
     }
 
-    /**
-     * Fired when the mouse was dragged while a button is being held down.
-     * See the two subclasses for listening before and after the normal handling.
-     *
-     * @see MouseScrolled.Pre
-     * @see MouseScrolled.Post
-     */
-    public static abstract class MouseScrolled extends MouseInput {
-        private final double deltaX;
-        private final double deltaY;
+    public static abstract class MouseScrollEvent extends MouseInputEvent
+    {
+        private final double scrollDelta;
 
-        @ApiStatus.Internal
-        public MouseScrolled(Screen screen, double mouseX, double mouseY, double deltaX, double deltaY) {
+        public MouseScrollEvent(Screen screen, double mouseX, double mouseY, double scrollDelta)
+        {
             super(screen, mouseX, mouseY);
-            this.deltaX = deltaX;
-            this.deltaY = deltaY;
+            this.scrollDelta = scrollDelta;
+        }
+
+        public double getScrollDelta()
+        {
+            return scrollDelta;
         }
 
         /**
-         * {@return the amount of change / delta of the mouse scroll in the vertical direction}
-         */
-        public double getDeltaX() {
-            return deltaX;
-        }
-
-        /**
-         * {@return the amount of change / delta of the mouse scroll in the horizontal direction}
-         */
-        public double getDeltaY() {
-            return deltaY;
-        }
-
-        /**
-         * Fired <b>before</b> the mouse scroll is handled by the screen.
-         *
-         * <p>This event is {@linkplain Cancelable cancellable}, and does not {@linkplain HasResult have a result}.
-         * If the event is cancelled, the screen's mouse scroll handler will be bypassed
-         * and the corresponding {@link MouseScrolled.Post} will not be fired.</p>
-         *
-         * <p>This event is fired on the {@linkplain MinecraftForge#EVENT_BUS main Forge event bus},
-         * only on the {@linkplain LogicalSide#CLIENT logical client}.</p>
+         * This event fires when a mouse scroll is detected for a GuiScreen, before it is handled.
+         * Cancel this event to bypass {@link GuiEventListener#mouseScrolled(double, double, double)}.
          */
         @Cancelable
-        public static class Pre extends MouseScrolled {
-            @ApiStatus.Internal
-            public Pre(Screen screen, double mouseX, double mouseY, double deltaX, double deltaY) {
-                super(screen, mouseX, mouseY, deltaX, deltaY);
+        public static class Pre extends MouseScrollEvent
+        {
+            public Pre(Screen screen, double mouseX, double mouseY, double scrollDelta)
+            {
+                super(screen, mouseX, mouseY, scrollDelta);
             }
         }
 
         /**
-         * Fired <b>after</b> the mouse scroll is handled, if not handled by the screen
-         * and the corresponding {@link MouseScrolled.Pre} is not cancelled.
-         *
-         * <p>This event is not {@linkplain Cancelable cancellable}, and does not {@linkplain HasResult have a result}.
-         * If the event is cancelled, the mouse scroll will be set as handled.</p>
-         *
-         * <p>This event is fired on the {@linkplain MinecraftForge#EVENT_BUS main Forge event bus},
-         * only on the {@linkplain LogicalSide#CLIENT logical client}.</p>
+         * This event fires after {@link GuiEventListener#mouseScrolled(double, double, double)} if the scroll was not already handled.
+         * Cancel this event when you successfully use the mouse scroll, to prevent other handlers from using the same input.
          */
-        public static class Post extends MouseScrolled {
-            @ApiStatus.Internal
-            public Post(Screen screen, double mouseX, double mouseY, double deltaX, double deltaY) {
-                super(screen, mouseX, mouseY, deltaX, deltaY);
+        @Cancelable
+        public static class Post extends MouseScrollEvent
+        {
+            public Post(Screen screen, double mouseX, double mouseY, double scrollDelta)
+            {
+                super(screen, mouseX, mouseY, scrollDelta);
             }
         }
     }
 
-    /**
-     * <p>Fired whenever a keyboard key is pressed or released.
-     * See the various subclasses to listen for key pressing or releasing.</p>
-     *
-     * @see KeyPressed
-     * @see KeyReleased
-     * @see InputConstants
-     * @see <a href="https://www.glfw.org/docs/latest/input_guide.html#input_key" target="_top">the online GLFW documentation</a>
-     */
-    private static abstract class KeyInput extends ScreenEvent {
+    public static abstract class KeyboardKeyEvent extends ScreenEvent
+    {
         private final int keyCode;
         private final int scanCode;
         private final int modifiers;
 
-        @ApiStatus.Internal
-        protected KeyInput(Screen screen, int keyCode, int scanCode, int modifiers) {
+        public KeyboardKeyEvent(Screen screen, int keyCode, int scanCode, int modifiers)
+        {
             super(screen);
             this.keyCode = keyCode;
             this.scanCode = scanCode;
@@ -673,286 +513,169 @@ public abstract class ScreenEvent extends Event {
         }
 
         /**
-         * {@return the {@code GLFW} (platform-agnostic) key code}
+         * The keyboard key that was pressed or released
+         * https://www.glfw.org/docs/latest/group__keys.html
          *
-         * @see InputConstants input constants starting with {@code KEY_}
-         * @see GLFW key constants starting with {@code GLFW_KEY_}
-         * @see <a href="https://www.glfw.org/docs/latest/group__keys.html" target="_top">the online GLFW documentation</a>
+         * @see GLFW key constants starting with "GLFW_KEY_"
          */
-        public int getKeyCode() {
+        public int getKeyCode()
+        {
             return keyCode;
         }
 
         /**
-         * {@return the platform-specific scan code}
-         * <p>
+         * Platform-specific scan code.
+         * Used for {@link com.mojang.blaze3d.platform.InputConstants#getKey(int, int)}
+         *
          * The scan code is unique for every key, regardless of whether it has a key code.
          * Scan codes are platform-specific but consistent over time, so keys will have different scan codes depending
          * on the platform but they are safe to save to disk as custom key bindings.
-         *
-         * @see InputConstants#getKey(int, int)
          */
-        public int getScanCode() {
+        public int getScanCode()
+        {
             return scanCode;
         }
 
         /**
-         * {@return a bit field representing the active modifier keys}
+         * Bit field representing the modifier keys pressed.
+         * https://www.glfw.org/docs/latest/group__mods.html
          *
-         * @see InputConstants#MOD_CONTROL CTRL modifier key bit
-         * @see GLFW#GLFW_MOD_SHIFT SHIFT modifier key bit
-         * @see GLFW#GLFW_MOD_ALT ALT modifier key bit
-         * @see GLFW#GLFW_MOD_SUPER SUPER modifier key bit
-         * @see GLFW#GLFW_KEY_CAPS_LOCK CAPS LOCK modifier key bit
-         * @see GLFW#GLFW_KEY_NUM_LOCK NUM LOCK modifier key bit
-         * @see <a href="https://www.glfw.org/docs/latest/group__mods.html" target="_top">the online GLFW documentation</a>
+         * @see GLFW#GLFW_MOD_SHIFT
+         * @see GLFW#GLFW_MOD_CONTROL
+         * @see GLFW#GLFW_MOD_ALT
+         * @see GLFW#GLFW_MOD_SUPER
          */
-        public int getModifiers() {
+        public int getModifiers()
+        {
             return modifiers;
         }
     }
 
-    /**
-     * Fired when a keyboard key is pressed.
-     * See the two subclasses for listening before and after the normal handling.
-     *
-     * @see KeyPressed.Pre
-     * @see KeyPressed.Post
-     */
-    public static abstract class KeyPressed extends KeyInput {
-        @ApiStatus.Internal
-        public KeyPressed(Screen screen, int keyCode, int scanCode, int modifiers) {
-            super(screen, keyCode, scanCode, modifiers);
+    public static abstract class KeyboardKeyPressedEvent extends KeyboardKeyEvent
+    {
+        public KeyboardKeyPressedEvent(Screen screen, int keyCode, int scanCode, int modifiers)
+        {
+            super(screen,  keyCode, scanCode, modifiers);
         }
 
         /**
-         * Fired <b>before</b> the key press is handled by the screen.
-         *
-         * <p>This event is {@linkplain Cancelable cancellable} and does not {@linkplain HasResult have a result}.
-         * If the event is cancelled, the screen's key press handler will be bypassed
-         * and the corresponding {@link KeyPressed.Post} will not be fired.</p>
-         *
-         * <p>This event is fired on the {@linkplain MinecraftForge#EVENT_BUS main Forge event bus},
-         * only on the {@linkplain LogicalSide#CLIENT logical client}.</p>
+         * This event fires when keyboard input is detected for a GuiScreen, before it is handled.
+         * Cancel this event to bypass {@link GuiEventListener#keyPressed(int, int, int)}.
          */
         @Cancelable
-        public static class Pre extends KeyPressed {
-            @ApiStatus.Internal
-            public Pre(Screen screen, int keyCode, int scanCode, int modifiers) {
+        public static class Pre extends KeyboardKeyPressedEvent
+        {
+            public Pre(Screen screen, int keyCode, int scanCode, int modifiers)
+            {
                 super(screen, keyCode, scanCode, modifiers);
             }
         }
 
         /**
-         * Fired <b>after</b> the key press is handled, if not handled by the screen
-         * and the corresponding {@link KeyPressed.Pre} is not cancelled.
-         *
-         * <p>This event is {@linkplain Cancelable cancellable}, and does not {@linkplain HasResult have a result}.
-         * If the event is cancelled, the key press will be set as handled.</p>
-         *
-         * <p>This event is fired on the {@linkplain MinecraftForge#EVENT_BUS main Forge event bus},
-         * only on the {@linkplain LogicalSide#CLIENT logical client}.</p>
+         * This event fires after {@link GuiEventListener#keyPressed(int, int, int)} if the key was not already handled.
+         * Cancel this event when you successfully use the keyboard input to prevent other handlers from using the same input.
          */
         @Cancelable
-        public static class Post extends KeyPressed {
-            @ApiStatus.Internal
-            public Post(Screen screen, int keyCode, int scanCode, int modifiers) {
+        public static class Post extends KeyboardKeyPressedEvent
+        {
+            public Post(Screen screen, int keyCode, int scanCode, int modifiers)
+            {
                 super(screen, keyCode, scanCode, modifiers);
             }
         }
     }
 
-    /**
-     * Fired when a keyboard key is released.
-     * See the two subclasses for listening before and after the normal handling.
-     *
-     * @see KeyReleased.Pre
-     * @see KeyReleased.Post
-     */
-    public static abstract class KeyReleased extends KeyInput {
-        @ApiStatus.Internal
-        public KeyReleased(Screen screen, int keyCode, int scanCode, int modifiers) {
+    public static abstract class KeyboardKeyReleasedEvent extends KeyboardKeyEvent
+    {
+        public KeyboardKeyReleasedEvent(Screen screen, int keyCode, int scanCode, int modifiers)
+        {
             super(screen, keyCode, scanCode, modifiers);
         }
 
         /**
-         * Fired <b>before</b> the key release is handled by the screen.
-         *
-         * <p>This event is {@linkplain Cancelable cancellable}, and does not {@linkplain HasResult have a result}.
-         * If the event is cancelled, the screen's key release handler will be bypassed
-         * and the corresponding {@link KeyReleased.Post} will not be fired.</p>
-         *
-         * <p>This event is fired on the {@linkplain MinecraftForge#EVENT_BUS main Forge event bus},
-         * only on the {@linkplain LogicalSide#CLIENT logical client}.</p>
+         * This event fires when keyboard input is detected for a GuiScreen, before it is handled.
+         * Cancel this event to bypass {@link GuiEventListener#keyReleased(int, int, int)}.
          */
         @Cancelable
-        public static class Pre extends KeyReleased {
-            @ApiStatus.Internal
-            public Pre(Screen screen, int keyCode, int scanCode, int modifiers) {
+        public static class Pre extends KeyboardKeyReleasedEvent
+        {
+            public Pre(Screen screen, int keyCode, int scanCode, int modifiers)
+            {
                 super(screen, keyCode, scanCode, modifiers);
             }
         }
 
         /**
-         * Fired <b>after</b> the key release is handled, if not handled by the screen
-         * and the corresponding {@link KeyReleased.Pre} is not cancelled.
-         *
-         * <p>This event is {@linkplain Cancelable cancellable}, and does not {@linkplain HasResult have a result}.
-         * If the event is cancelled, the key release will be set as handled.</p>
-         *
-         * <p>This event is fired on the {@linkplain MinecraftForge#EVENT_BUS main Forge event bus},
-         * only on the {@linkplain LogicalSide#CLIENT logical client}.</p>
+         * This event fires after {@link GuiEventListener#keyReleased(int, int, int)} if the key was not already handled.
+         * Cancel this event when you successfully use the keyboard input to prevent other handlers from using the same input.
          */
         @Cancelable
-        public static class Post extends KeyReleased {
-            @ApiStatus.Internal
-            public Post(Screen screen, int keyCode, int scanCode, int modifiers) {
+        public static class Post extends KeyboardKeyReleasedEvent
+        {
+            public Post(Screen screen, int keyCode, int scanCode, int modifiers)
+            {
                 super(screen, keyCode, scanCode, modifiers);
             }
         }
     }
 
-    /**
-     * Fired when a keyboard key corresponding to a character is typed.
-     * See the two subclasses for listening before and after the normal handling.
-     *
-     * @see CharacterTyped.Pre
-     * @see CharacterTyped.Post
-     * @see <a href="https://www.glfw.org/docs/latest/input_guide.html#input_char" target="_top">the online GLFW documentation</a>
-     */
-    public static class CharacterTyped extends ScreenEvent {
+    public static class KeyboardCharTypedEvent extends ScreenEvent
+    {
         private final char codePoint;
         private final int modifiers;
 
-        @ApiStatus.Internal
-        public CharacterTyped(Screen screen, char codePoint, int modifiers) {
+        public KeyboardCharTypedEvent(Screen screen, char codePoint, int modifiers)
+        {
             super(screen);
             this.codePoint = codePoint;
             this.modifiers = modifiers;
         }
 
         /**
-         * {@return the character code point}
+         * The code point typed, used for text entry.
          */
-        public char getCodePoint() {
+        public char getCodePoint()
+        {
             return codePoint;
         }
 
         /**
-         * {@return a bit field representing the active modifier keys}
+         * Bit field representing the modifier keys pressed.
          *
-         * @see InputConstants#MOD_CONTROL CTRL modifier key bit
-         * @see GLFW#GLFW_MOD_SHIFT SHIFT modifier key bit
-         * @see GLFW#GLFW_MOD_ALT ALT modifier key bit
-         * @see GLFW#GLFW_MOD_SUPER SUPER modifier key bit
-         * @see GLFW#GLFW_KEY_CAPS_LOCK CAPS LOCK modifier key bit
-         * @see GLFW#GLFW_KEY_NUM_LOCK NUM LOCK modifier key bit
-         * @see <a href="https://www.glfw.org/docs/latest/group__mods.html" target="_top">the online GLFW documentation</a>
+         * @see GLFW#GLFW_MOD_SHIFT
+         * @see GLFW#GLFW_MOD_CONTROL
+         * @see GLFW#GLFW_MOD_ALT
+         * @see GLFW#GLFW_MOD_SUPER
          */
-        public int getModifiers() {
+        public int getModifiers()
+        {
             return modifiers;
         }
 
         /**
-         * Fired <b>before</b> the character input is handled by the screen.
-         *
-         * <p>This event is {@linkplain Cancelable cancellable}, and does not {@linkplain HasResult have a result}.
-         * If the event is cancelled, the screen's character input handler will be bypassed
-         * and the corresponding {@link CharacterTyped.Post} will not be fired.</p>
-         *
-         * <p>This event is fired on the {@linkplain MinecraftForge#EVENT_BUS main Forge event bus},
-         * only on the {@linkplain LogicalSide#CLIENT logical client}.</p>
+         * This event fires when keyboard character input is detected for a GuiScreen, before it is handled.
+         * Cancel this event to bypass {@link GuiEventListener#charTyped(char, int)}.
          */
         @Cancelable
-        public static class Pre extends CharacterTyped {
-            @ApiStatus.Internal
-            public Pre(Screen screen, char codePoint, int modifiers) {
+        public static class Pre extends KeyboardCharTypedEvent
+        {
+            public Pre(Screen screen, char codePoint, int modifiers)
+            {
                 super(screen, codePoint, modifiers);
             }
         }
 
         /**
-         * Fired <b>after</b> the character input is handled, if not handled by the screen
-         * and the corresponding {@link CharacterTyped.Pre} is not cancelled.
-         *
-         * <p>This event is {@linkplain Cancelable cancellable}, and does not {@linkplain HasResult have a result}.
-         * If the event is cancelled, the character input will be set as handled.</p>
-         *
-         * <p>This event is fired on the {@linkplain MinecraftForge#EVENT_BUS main Forge event bus},
-         * only on the {@linkplain LogicalSide#CLIENT logical client}.</p>
+         * This event fires after {@link GuiEventListener#charTyped(char, int)} if the character was not already handled.
+         * Cancel this event when you successfully use the keyboard input to prevent other handlers from using the same input.
          */
-        public static class Post extends CharacterTyped {
-            @ApiStatus.Internal
-            public Post(Screen screen, char codePoint, int modifiers) {
+        @Cancelable
+        public static class Post extends KeyboardCharTypedEvent
+        {
+            public Post(Screen screen, char codePoint, int modifiers)
+            {
                 super(screen, codePoint, modifiers);
             }
-        }
-    }
-
-    /**
-     * Fired before any {@link Screen} is opened, to allow changing it or preventing it from being opened.
-     * All screen layers on the screen are closed before this event is fired.
-     *
-     * <p>This event is {@linkplain Cancelable cancellable}, and does not {@linkplain HasResult have a result}.
-     * If this event is cancelled, then the {@code Screen} shall be prevented from opening and any previous screen
-     * will remain open. However, cancelling this event will not prevent the closing of screen layers which happened before
-     * this event fired.</p>
-     *
-     * <p>This event is fired on the {@linkplain MinecraftForge#EVENT_BUS main Forge event bus},
-     * only on the {@linkplain LogicalSide#CLIENT logical client}.</p>
-     */
-    @Cancelable
-    public static class Opening extends ScreenEvent {
-        @Nullable
-        private final Screen currentScreen;
-        private Screen newScreen;
-
-        @ApiStatus.Internal
-        public Opening(@Nullable Screen currentScreen, Screen screen) {
-            super(screen);
-            this.currentScreen = currentScreen;
-            this.newScreen = screen;
-        }
-
-        /**
-         * Gets the currently open screen at the time of the event being fired.
-         * <p>
-         * May be null if no screen was open.
-         */
-        @Nullable
-        public Screen getCurrentScreen() {
-            return currentScreen;
-        }
-
-        /**
-         * @return The screen that will be opened if the event is not cancelled. May be null.
-         */
-        @Nullable
-        public Screen getNewScreen() {
-            return newScreen;
-        }
-
-        /**
-         * Sets the new screen to be opened if the event is not cancelled. May be null.
-         */
-        public void setNewScreen(Screen newScreen) {
-            this.newScreen = newScreen;
-        }
-    }
-
-    /**
-     * Fired before a {@link Screen} is closed.
-     * All screen layers on the screen are closed before this event is fired.
-     *
-     * <p>This event is not {@linkplain Cancelable cancellable}, and does not {@linkplain HasResult have a result}.</p>
-     *
-     * <p>This event is fired on the {@linkplain MinecraftForge#EVENT_BUS main Forge event bus},
-     * only on the {@linkplain LogicalSide#CLIENT logical client}.</p>
-     */
-    public static class Closing extends ScreenEvent {
-        @ApiStatus.Internal
-        public Closing(Screen screen) {
-            super(screen);
         }
     }
 }

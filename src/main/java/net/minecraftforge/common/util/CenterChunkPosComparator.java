@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Forge Development LLC and contributors
+ * Minecraft Forge - Forge Development LLC
  * SPDX-License-Identifier: LGPL-2.1-only
  */
 
@@ -11,8 +11,8 @@ import net.minecraft.world.level.ChunkPos;
 // Sorter to load nearby chunks first
 public class CenterChunkPosComparator implements java.util.Comparator<ChunkPos>
 {
-    private final int x;
-    private final int z;
+    private int x;
+    private int z;
 
     public CenterChunkPosComparator(ServerPlayer entityplayer)
     {

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Forge Development LLC and contributors
+ * Minecraft Forge - Forge Development LLC
  * SPDX-License-Identifier: LGPL-2.1-only
  */
 
@@ -8,15 +8,15 @@ package net.minecraftforge.event.entity.living;
 import net.minecraft.world.entity.Entity;
 import net.minecraftforge.common.ForgeHooks;
 import net.minecraftforge.common.MinecraftForge;
-import net.minecraftforge.event.ForgeEventFactory;
 import net.minecraftforge.eventbus.api.Cancelable;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraftforge.event.entity.EntityEvent;
 import net.minecraftforge.eventbus.api.Event;
-import org.jetbrains.annotations.Nullable;
+
+import javax.annotation.Nullable;
 
 /**
- * LivingEvent is fired whenever an event involving a {@link LivingEntity} occurs.<br>
+ * LivingEvent is fired whenever an event involving Living entities occurs.<br>
  * If a method utilizes this {@link Event} as its parameter, the method will
  * receive every child event of this class.<br>
  * <br>
@@ -24,24 +24,24 @@ import org.jetbrains.annotations.Nullable;
  **/
 public class LivingEvent extends EntityEvent
 {
-    private final LivingEntity livingEntity;
-
+    private final LivingEntity entityLiving;
     public LivingEvent(LivingEntity entity)
     {
         super(entity);
-        livingEntity = entity;
+        entityLiving = entity;
     }
 
-    @Override
-    public LivingEntity getEntity()
+    public LivingEntity getEntityLiving()
     {
-        return livingEntity;
+        return entityLiving;
     }
 
     /**
-     * LivingUpdateEvent is fired when a LivingEntity is ticked in {@link LivingEntity#tick()}. <br>
+     * LivingUpdateEvent is fired when an Entity is updated. <br>
+     * This event is fired whenever an Entity is updated in
+     * {@link LivingEntity#tick()}. <br>
      * <br>
-     * This event is fired via the {@link ForgeEventFactory#onLivingTick(LivingEntity)}.<br>
+     * This event is fired via the {@link ForgeHooks#onLivingUpdate(LivingEntity)}.<br>
      * <br>
      * This event is {@link Cancelable}.<br>
      * If this event is canceled, the Entity does not update.<br>
@@ -51,9 +51,9 @@ public class LivingEvent extends EntityEvent
      * This event is fired on the {@link MinecraftForge#EVENT_BUS}.
      **/
     @Cancelable
-    public static class LivingTickEvent extends LivingEvent
+    public static class LivingUpdateEvent extends LivingEvent
     {
-        public LivingTickEvent(LivingEntity e){ super(e); }
+        public LivingUpdateEvent(LivingEntity e){ super(e); }
     }
 
     /**

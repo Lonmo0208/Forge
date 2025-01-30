@@ -1,47 +1,84 @@
 /*
- * Copyright (c) Forge Development LLC and contributors
+ * Minecraft Forge - Forge Development LLC
  * SPDX-License-Identifier: LGPL-2.1-only
  */
 
 package net.minecraftforge.client.textures;
 
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
+
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.server.packs.metadata.MetadataSectionType;
+import net.minecraft.server.packs.metadata.MetadataSectionSerializer;
 import net.minecraft.server.packs.resources.Resource;
-import com.mojang.serialization.Codec;
-import com.mojang.serialization.codecs.RecordCodecBuilder;
+import net.minecraft.util.GsonHelper;
+import net.minecraftforge.client.MinecraftForgeClient;
 
-import org.jetbrains.annotations.Nullable;
-
-import java.io.IOException;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonSyntaxException;
 
 /**
  * The "forge" section of texture metadata files (.mcmeta). Currently used only to specify custom
  * TextureAtlasSprite loaders.
- *
  * @see ITextureAtlasSpriteLoader
  */
-public record ForgeTextureMetadata(@Nullable ITextureAtlasSpriteLoader loader) {
+public final class ForgeTextureMetadata
+{
+
     public static final ForgeTextureMetadata EMPTY = new ForgeTextureMetadata(null);
+    public static final MetadataSectionSerializer<ForgeTextureMetadata> SERIALIZER = new Serializer();
 
-    private static final Codec<ITextureAtlasSpriteLoader> LOADER_CODEC = Codec.<ITextureAtlasSpriteLoader>stringResolver(
-        loader -> {
-            var ret = TextureAtlasSpriteLoaderManager.getKey(loader);
-            return ret == null ? null : ret.toString();
-        },
-        name -> TextureAtlasSpriteLoaderManager.get(ResourceLocation.parse(name))
-    );
-
-    private static final Codec<ForgeTextureMetadata> CODEC = RecordCodecBuilder.create(i ->
-        i.group(
-            LOADER_CODEC.fieldOf("loader").forGetter(ForgeTextureMetadata::loader)
-        ).apply(i, ForgeTextureMetadata::new)
-    );
-
-
-    public static final MetadataSectionType<ForgeTextureMetadata> TYPE = new MetadataSectionType<>("forge", CODEC);
-
-    public static ForgeTextureMetadata forResource(Resource resource) throws IOException {
-        return resource.metadata().getSection(TYPE).orElse(EMPTY);
+    public static ForgeTextureMetadata forResource(Resource resource)
+    {
+        ForgeTextureMetadata metadata = resource.getMetadata(SERIALIZER);
+        return metadata == null ? EMPTY : metadata;
     }
+
+    @Nullable
+    private final ITextureAtlasSpriteLoader loader;
+
+    public ForgeTextureMetadata(@Nullable ITextureAtlasSpriteLoader loader)
+    {
+        this.loader = loader;
+    }
+
+    @Nullable
+    public ITextureAtlasSpriteLoader getLoader()
+    {
+        return loader;
+    }
+
+    private static final class Serializer implements MetadataSectionSerializer<ForgeTextureMetadata>
+    {
+
+        @Override
+        @Nonnull
+        public String getMetadataSectionName()
+        {
+            return "forge";
+        }
+
+        @Override
+        @Nonnull
+        public ForgeTextureMetadata fromJson(JsonObject json)
+        {
+            @Nullable
+            ITextureAtlasSpriteLoader loader;
+            if (json.has("loader"))
+            {
+                ResourceLocation loaderName = new ResourceLocation(GsonHelper.getAsString(json, "loader"));
+                loader = MinecraftForgeClient.getTextureAtlasSpriteLoader(loaderName);
+                if (loader == null)
+                {
+                    throw new JsonSyntaxException("Unknown TextureAtlasSpriteLoader " + loaderName);
+                }
+            }
+            else
+            {
+                loader = null;
+            }
+            return new ForgeTextureMetadata(loader);
+        }
+    }
+
 }

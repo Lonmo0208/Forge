@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Forge Development LLC and contributors
+ * Minecraft Forge - Forge Development LLC
  * SPDX-License-Identifier: LGPL-2.1-only
  */
 
@@ -10,8 +10,8 @@ import java.util.Collection;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraftforge.common.ForgeHooks;
 import net.minecraftforge.common.MinecraftForge;
-import net.minecraftforge.event.ForgeEventFactory;
 import net.minecraftforge.eventbus.api.Cancelable;
 
 /**
@@ -19,7 +19,7 @@ import net.minecraftforge.eventbus.api.Cancelable;
  * This event is fired whenever an Entity dies and drops items in
  * {@link LivingEntity#die(DamageSource)}.<br>
  * <br>
- * This event is fired via the {@link ForgeEventFactory#onLivingDrops(LivingEntity, DamageSource, Collection, int, boolean)} .<br>
+ * This event is fired via the {@link ForgeHooks#onLivingDrops(LivingEntity, DamageSource, Collection, int, boolean)} .<br>
  * <br>
  * {@link #source} contains the DamageSource that caused the drop to occur.<br>
  * {@link #drops} contains the ArrayList of EntityItems that will be dropped.<br>
@@ -34,27 +34,39 @@ import net.minecraftforge.eventbus.api.Cancelable;
  * This event is fired on the {@link MinecraftForge#EVENT_BUS}.
  **/
 @net.minecraftforge.eventbus.api.Cancelable
-public class LivingDropsEvent extends LivingEvent {
+public class LivingDropsEvent extends LivingEvent
+{
     private final DamageSource source;
     private final Collection<ItemEntity> drops;
+    private final int lootingLevel;
     private final boolean recentlyHit;
 
-    public LivingDropsEvent(LivingEntity entity, DamageSource source, Collection<ItemEntity> drops, boolean recentlyHit) {
+    public LivingDropsEvent(LivingEntity entity, DamageSource source, Collection<ItemEntity> drops, int lootingLevel, boolean recentlyHit)
+    {
         super(entity);
         this.source = source;
         this.drops = drops;
+        this.lootingLevel = lootingLevel;
         this.recentlyHit = recentlyHit;
     }
 
-    public DamageSource getSource() {
+    public DamageSource getSource()
+    {
         return source;
     }
 
-    public Collection<ItemEntity> getDrops() {
+    public Collection<ItemEntity> getDrops()
+    {
         return drops;
     }
 
-    public boolean isRecentlyHit() {
+    public int getLootingLevel()
+    {
+        return lootingLevel;
+    }
+
+    public boolean isRecentlyHit()
+    {
         return recentlyHit;
     }
 }

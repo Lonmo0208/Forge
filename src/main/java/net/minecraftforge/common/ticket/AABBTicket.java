@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Forge Development LLC and contributors
+ * Minecraft Forge - Forge Development LLC
  * SPDX-License-Identifier: LGPL-2.1-only
  */
 
@@ -7,14 +7,15 @@ package net.minecraftforge.common.ticket;
 
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
-import org.jetbrains.annotations.NotNull;
+
+import javax.annotation.Nonnull;
 
 public class AABBTicket extends SimpleTicket<Vec3>
 {
-    @NotNull
+    @Nonnull
     public final AABB axisAlignedBB;
 
-    public AABBTicket(@NotNull AABB axisAlignedBB)
+    public AABBTicket(@Nonnull AABB axisAlignedBB)
     {
         this.axisAlignedBB = axisAlignedBB;
     }

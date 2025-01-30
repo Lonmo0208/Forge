@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Forge Development LLC and contributors
+ * Minecraft Forge - Forge Development LLC
  * SPDX-License-Identifier: LGPL-2.1-only
  */
 
@@ -8,7 +8,9 @@ package net.minecraftforge.fluids.capability.templates;
 import net.minecraftforge.fluids.FluidStack;
 import net.minecraftforge.fluids.capability.IFluidHandler;
 
-import org.jetbrains.annotations.NotNull;
+import javax.annotation.Nonnull;
+
+import net.minecraftforge.fluids.capability.IFluidHandler.FluidAction;
 
 /**
  * VoidFluidHandler is a template fluid handler that can be filled indefinitely without ever getting full.
@@ -23,7 +25,7 @@ public class VoidFluidHandler implements IFluidHandler
     @Override
     public int getTanks() { return 1; }
 
-    @NotNull
+    @Nonnull
     @Override
     public FluidStack getFluidInTank(int tank) { return FluidStack.EMPTY; }
 
@@ -31,7 +33,7 @@ public class VoidFluidHandler implements IFluidHandler
     public int getTankCapacity(int tank) { return Integer.MAX_VALUE; }
 
     @Override
-    public boolean isFluidValid(int tank, @NotNull FluidStack stack) { return true; }
+    public boolean isFluidValid(int tank, @Nonnull FluidStack stack) { return true; }
 
     @Override
     public int fill(FluidStack resource, FluidAction action)
@@ -39,14 +41,14 @@ public class VoidFluidHandler implements IFluidHandler
         return resource.getAmount();
     }
 
-    @NotNull
+    @Nonnull
     @Override
     public FluidStack drain(FluidStack resource, FluidAction action)
     {
         return FluidStack.EMPTY;
     }
 
-    @NotNull
+    @Nonnull
     @Override
     public FluidStack drain(int maxDrain, FluidAction action)
     {

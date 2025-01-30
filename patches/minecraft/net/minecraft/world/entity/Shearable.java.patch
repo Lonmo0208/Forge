@@ -1,18 +1,14 @@
 --- a/net/minecraft/world/entity/Shearable.java
 +++ b/net/minecraft/world/entity/Shearable.java
-@@ -4,8 +_,14 @@
+@@ -2,8 +_,11 @@
+ 
  import net.minecraft.sounds.SoundSource;
- import net.minecraft.world.item.ItemStack;
  
--public interface Shearable {
-+public interface Shearable extends net.minecraftforge.common.IForgeShearable {
-+    /** @deprecated Use {@link net.minecraftforge.common.IForgeShearable#onSheared} */
-     void shear(ServerLevel p_368224_, SoundSource p_21749_, ItemStack p_362173_);
++@Deprecated // Forge: Use IForgeShearable
+ public interface Shearable {
++   @Deprecated // Forge: Use IForgeShearable
+    void m_5851_(SoundSource p_21749_);
  
-+    /** @deprecated Use {@link net.minecraftforge.common.IForgeShearable#isShearable} */
-     boolean readyForShearing();
-+
-+    default boolean isShearable(net.minecraft.world.item.ItemStack item, net.minecraft.world.level.Level level, net.minecraft.core.BlockPos pos) {
-+        return readyForShearing();
-+    }
++   @Deprecated // Forge: Use IForgeShearable
+    boolean m_6220_();
  }

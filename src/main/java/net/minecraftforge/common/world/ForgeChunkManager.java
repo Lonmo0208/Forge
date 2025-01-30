@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Forge Development LLC and contributors
+ * Minecraft Forge - Forge Development LLC
  * SPDX-License-Identifier: LGPL-2.1-only
  */
 
@@ -15,7 +15,6 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.UUID;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
@@ -63,7 +62,7 @@ public class ForgeChunkManager
      */
     public static boolean hasForcedChunks(ServerLevel level)
     {
-        ForcedChunksSavedData data = level.getDataStorage().get(ForcedChunksSavedData.factory(), "chunks");
+        ForcedChunksSavedData data = level.getDataStorage().get(ForcedChunksSavedData::load, "chunks");
         if (data == null) return false;
         return !data.getChunks().isEmpty() || !data.getBlockForcedChunks().isEmpty() || !data.getEntityForcedChunks().isEmpty();
     }
@@ -116,7 +115,7 @@ public class ForgeChunkManager
             LOGGER.warn("A mod attempted to force a chunk for an unloaded mod of id: {}", modId);
             return false;
         }
-        ForcedChunksSavedData saveData = level.getDataStorage().computeIfAbsent(ForcedChunksSavedData.factory(), "chunks");
+        ForcedChunksSavedData saveData = level.getDataStorage().computeIfAbsent(ForcedChunksSavedData::load, ForcedChunksSavedData::new, "chunks");
         ChunkPos pos = new ChunkPos(chunkX, chunkZ);
         long chunk = pos.toLong();
         TicketTracker<T> tickets = ticketGetter.apply(saveData);
@@ -153,9 +152,16 @@ public class ForgeChunkManager
           boolean ticking)
     {
         if (add)
-            level.getChunkSource().addRegionTicket(type, pos, 2, owner, ticking);
+        {
+            if (ticking)
+                level.getChunkSource().registerTickingTicket(type, pos, 2, owner);
+            else
+                level.getChunkSource().addRegionTicket(type, pos, 2, owner);
+        }
+        else if (ticking)
+            level.getChunkSource().releaseTickingTicket(type, pos, 2, owner);
         else
-            level.getChunkSource().removeRegionTicket(type, pos, 2, owner, ticking);
+            level.getChunkSource().removeRegionTicket(type, pos, 2, owner);
     }
 
     /**
@@ -325,12 +331,10 @@ public class ForgeChunkManager
      */
     private static void readBlockForcedChunks(String modId, long chunkPos, CompoundTag modEntry, String key, Map<TicketOwner<BlockPos>, LongSet> blockForcedChunks)
     {
-        ListTag forcedBlocks = modEntry.getList(key, Tag.TAG_INT_ARRAY);
+        ListTag forcedBlocks = modEntry.getList(key, Tag.TAG_COMPOUND);
         for (int k = 0; k < forcedBlocks.size(); k++)
         {
-            var aint = forcedBlocks.getIntArray(k);
-            var pos = aint.length == 3 ? new BlockPos(aint[0], aint[1], aint[2]) : BlockPos.ZERO;
-            blockForcedChunks.computeIfAbsent(new TicketOwner<>(modId, pos), owner -> new LongOpenHashSet()).add(chunkPos);
+            blockForcedChunks.computeIfAbsent(new TicketOwner<>(modId, NbtUtils.readBlockPos(forcedBlocks.getCompound(k))), owner -> new LongOpenHashSet()).add(chunkPos);
         }
     }
 

@@ -1,6 +1,20 @@
 /*
- * Copyright (c) Forge Development LLC and contributors
- * SPDX-License-Identifier: LGPL-2.1-only
+ * Minecraft Forge
+ * Copyright (c) 2016-2021.
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation version 2.1
+ * of the License.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
 package net.minecraftforge.fml;
@@ -8,30 +22,30 @@ package net.minecraftforge.fml;
 import com.google.common.collect.ImmutableList;
 import net.minecraftforge.eventbus.api.Event;
 import net.minecraftforge.fml.event.IModBusEvent;
-import net.minecraftforge.fml.loading.FMLEnvironment;
 import net.minecraftforge.fml.loading.FMLLoader;
-import net.minecraftforge.fml.loading.ImmediateWindowHandler;
 import net.minecraftforge.fml.loading.LoadingModList;
 import net.minecraftforge.fml.loading.moddiscovery.InvalidModIdentifier;
+import net.minecraftforge.fml.loading.moddiscovery.ModFile;
 import net.minecraftforge.fml.loading.moddiscovery.ModFileInfo;
-import net.minecraftforge.fml.loading.moddiscovery.ModInfo;
-import net.minecraftforge.fml.loading.progress.ProgressMeter;
-import net.minecraftforge.fml.loading.progress.StartupNotificationManager;
+import net.minecraftforge.fml.loading.progress.StartupMessageManager;
 import net.minecraftforge.forgespi.language.IModInfo;
 import net.minecraftforge.forgespi.language.IModLanguageProvider;
-import net.minecraftforge.forgespi.locating.ForgeFeature;
-import net.minecraftforge.forgespi.locating.IModFile;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-import java.util.*;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.Executor;
-import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+
 import static net.minecraftforge.fml.Logging.CORE;
 import static net.minecraftforge.fml.Logging.LOADING;
 
@@ -71,53 +85,48 @@ import static net.minecraftforge.fml.Logging.LOADING;
  *     and completes the mod loading sequence.</dd>
  * </dl>
  */
-public class ModLoader {
+public class ModLoader
+{
     private static final Logger LOGGER = LogManager.getLogger();
+    private static ModLoader INSTANCE;
     private final LoadingModList loadingModList;
 
     private final List<ModLoadingException> loadingExceptions;
-    private final Set<IModInfo> erroredModInfos;
     private final List<ModLoadingWarning> loadingWarnings;
     private final ModStateManager stateManager;
-    private static boolean loadingStateValid;
-    private final Consumer<String> statusConsumer = StartupNotificationManager.modLoaderConsumer().orElse(msg -> {});
-    private final Set<IModLoadingState> completedStates = new HashSet<>();
+    private boolean loadingStateValid;
+    @SuppressWarnings("OptionalUsedAsFieldOrParameterType")
+    private final Optional<Consumer<String>> statusConsumer = StartupMessageManager.modLoaderConsumer();
     private ModList modList;
 
-    private ModLoader() {
+    private ModLoader()
+    {
+        INSTANCE = this;
         this.loadingModList = FMLLoader.getLoadingModList();
-        this.loadingExceptions = this.loadingModList.getErrors().stream()
+        this.loadingExceptions = FMLLoader.getLoadingModList().getErrors().stream()
                 .flatMap(ModLoadingException::fromEarlyException)
-                .toList();
-        this.loadingWarnings = this.loadingModList.getBrokenFiles().stream()
+                .collect(Collectors.toList());
+        this.loadingWarnings = FMLLoader.getLoadingModList().getBrokenFiles().stream()
                 .map(file -> new ModLoadingWarning(null, ModLoadingStage.VALIDATE, InvalidModIdentifier.identifyJarProblem(file.getFilePath()).orElse("fml.modloading.brokenfile"), file.getFileName()))
                 .collect(Collectors.toList());
-        if (this.loadingExceptions.isEmpty()) {
-            this.erroredModInfos = Collections.emptySet();
-        } else {
-            this.erroredModInfos = Collections.newSetFromMap(new IdentityHashMap<>());
-            this.erroredModInfos.addAll(this.loadingExceptions.stream().map(ModLoadingException::getModInfo).toList());
-        }
-        this.loadingModList.getModFiles().stream()
-                .filter(ModFileInfo::missingLicense)
-                .filter(modFileInfo -> modFileInfo.getMods().stream().noneMatch(this.erroredModInfos::contains)) //Ignore files where any other mod already encountered an error
+        FMLLoader.getLoadingModList().getModFiles().stream()
+                .filter(ModFileInfo::missingLicense) //Search for files with missing licenses
+                .filter(modFileInfo -> modFileInfo.getMods().stream().noneMatch(thisModInfo -> this.loadingExceptions.stream().map(ModLoadingException::getModInfo).anyMatch(otherInfo -> otherInfo == thisModInfo))) //Ignore files where any other mod already encountered an error
                 .map(modFileInfo -> new ModLoadingException(null, ModLoadingStage.VALIDATE, "fml.modloading.missinglicense", null, modFileInfo.getFile()))
                 .forEach(this.loadingExceptions::add);
         this.stateManager = new ModStateManager();
         CrashReportCallables.registerCrashCallable("ModLauncher", FMLLoader::getLauncherInfo);
         CrashReportCallables.registerCrashCallable("ModLauncher launch target", FMLLoader::launcherHandlerName);
         CrashReportCallables.registerCrashCallable("ModLauncher naming", FMLLoader::getNaming);
-        CrashReportCallables.registerCrashCallable("ModLauncher services", ModLoader::computeModLauncherServiceList);
-        CrashReportCallables.registerCrashCallable("FML Language Providers", ModLoader::computeLanguageList);
+        CrashReportCallables.registerCrashCallable("ModLauncher services", this::computeModLauncherServiceList);
+        CrashReportCallables.registerCrashCallable("FML Language Providers", this::computeLanguageList);
     }
 
-    private static String computeLanguageList() {
-        return "\n" + FMLLoader.getLanguageLoadingProvider()
-                .applyForEach(lp -> lp.name() + "@" + lp.getClass().getPackage().getImplementationVersion())
-                .collect(Collectors.joining("\n\t\t", "\t\t", ""));
+    private String computeLanguageList() {
+        return "\n"+FMLLoader.getLanguageLoadingProvider().applyForEach(lp->lp.name() +"@"+ lp.getClass().getPackage().getImplementationVersion()).collect(Collectors.joining("\n\t\t", "\t\t", ""));
     }
 
-    private static String computeModLauncherServiceList() {
+    private String computeModLauncherServiceList() {
         final List<Map<String, String>> mods = FMLLoader.modLauncherModList();
         return "\n"+mods.stream().map(mod->mod.getOrDefault("file","nofile")+
                 " "+mod.getOrDefault("name", "missing")+
@@ -126,13 +135,9 @@ public class ModLoader {
                 collect(Collectors.joining("\n\t\t","\t\t",""));
     }
 
-    public static ModLoader get() {
-        return LazyInit.INSTANCE;
-    }
-
-    private static final class LazyInit {
-        private static final ModLoader INSTANCE = new ModLoader();
-        private LazyInit() {}
+    public static ModLoader get()
+    {
+        return INSTANCE == null ? INSTANCE = new ModLoader() : INSTANCE;
     }
 
     /**
@@ -142,199 +147,124 @@ public class ModLoader {
      * @param periodicTask Optional periodic task to perform on the main thread while other activities run
      */
     public void gatherAndInitializeMods(final ModWorkManager.DrivenExecutor syncExecutor, final Executor parallelExecutor, final Runnable periodicTask) {
-        ForgeFeature.registerFeature("javaVersion", ForgeFeature.VersionFeatureTest.forVersionString(IModInfo.DependencySide.BOTH, System.getProperty("java.version")));
-        ForgeFeature.registerFeature("openGLVersion", ForgeFeature.VersionFeatureTest.forVersionString(IModInfo.DependencySide.CLIENT, ImmediateWindowHandler.getGLVersion()));
         loadingStateValid = true;
+        statusConsumer.ifPresent(c->c.accept("Waiting for scan to complete"));
         FMLLoader.backgroundScanHandler.waitForScanToComplete(periodicTask);
+        statusConsumer.ifPresent(c->c.accept("Loading mods"));
         final ModList modList = ModList.of(loadingModList.getModFiles().stream().map(ModFileInfo::getFile).toList(),
                 loadingModList.getMods());
         if (!this.loadingExceptions.isEmpty()) {
-            LOGGER.fatal(CORE, "Error during pre-loading phase", loadingExceptions.getFirst());
-            statusConsumer.accept("ERROR DURING MOD LOADING");
+            LOGGER.fatal(CORE, "Error during pre-loading phase", loadingExceptions.get(0));
             modList.setLoadedMods(Collections.emptyList());
             loadingStateValid = false;
             throw new LoadingFailedException(loadingExceptions);
         }
-        List<? extends ForgeFeature.Bound> failedBounds = loadingModList.getMods().stream()
-                .map(ModInfo::getForgeFeatures)
-                .flatMap(List::stream)
-                .filter(bound -> !ForgeFeature.testFeature(FMLEnvironment.dist, bound))
+        statusConsumer.ifPresent(c->c.accept("Building Mod List"));
+        final List<ModContainer> modContainers = loadingModList.getModFiles().stream()
+                .map(ModFileInfo::getFile)
+                .map(this::buildMods)
+                .<ModContainer>mapMulti(Iterable::forEach)
                 .toList();
-
-        if (!failedBounds.isEmpty()) {
-            LOGGER.fatal(CORE, "Failed to validate feature bounds for mods: {}", failedBounds);
-            statusConsumer.accept("ERROR DURING MOD LOADING");
-            modList.setLoadedMods(Collections.emptyList());
-            loadingStateValid = false;
-            throw new LoadingFailedException(failedBounds.stream()
-                    .map(fb -> new ModLoadingException(fb.modInfo(), ModLoadingStage.CONSTRUCT, "fml.modloading.feature.missing", null, fb, ForgeFeature.featureValue(fb)))
-                    .toList());
-        }
-
-        final var modContainers = new HashMap<String, ModContainer>();
-        for (var file : loadingModList.getModFiles()) {
-            var containers = this.buildMods(file.getFile());
-            for (var container : containers)
-                modContainers.put(container.getModId(), container);
-        }
-
         if (!loadingExceptions.isEmpty()) {
-            LOGGER.fatal(CORE, "Failed to initialize mod containers", loadingExceptions.getFirst());
-            statusConsumer.accept("ERROR DURING MOD LOADING");
+            LOGGER.fatal(CORE, "Failed to initialize mod containers", loadingExceptions.get(0));
             modList.setLoadedMods(Collections.emptyList());
             loadingStateValid = false;
             throw new LoadingFailedException(loadingExceptions);
         }
-
-        // Gather all dependencies, so we can make sure they have finished their transition events before we fire ours
-        for (var mod : modContainers.values()) {
-            for (var dep : mod.getModInfo().getDependencies()) {
-                var target = modContainers.get(dep.getModId());
-                if (target == null)
-                    continue;
-
-                switch (dep.getOrdering()) {
-                    case AFTER:
-                        mod.dependencies.add(target);
-                        break;
-                    case BEFORE:
-                        target.dependencies.add(mod);
-                        break;
-                    default:
-                        break;
-                }
-            }
-        }
-
-        modList.setLoadedMods(modContainers.values().stream().toList());
+        modList.setLoadedMods(modContainers);
         this.modList = modList;
-        var stateList = stateManager.getStates(ModLoadingPhase.GATHER);
-        var progress = StartupMessageManager.addProgressBar("Mod Gather", stateList.stream().mapToInt(mls -> mls.size().applyAsInt(this.modList)).sum());
-        for (IModLoadingState mls : stateList) {
-            dispatchAndHandleError(mls, syncExecutor, parallelExecutor, periodicTask, progress);
-        }
-        progress.complete();
+        statusConsumer.ifPresent(c->c.accept("Dispatching gathering events"));
+        stateManager.getStates(ModLoadingPhase.GATHER).forEach(mls->dispatchAndHandleError(mls, syncExecutor, parallelExecutor, periodicTask));
+        statusConsumer.ifPresent(c->c.accept("Gathering phase complete"));
     }
 
     public void loadMods(final ModWorkManager.DrivenExecutor syncExecutor, final Executor parallelExecutor, final Runnable periodicTask) {
-        var stateList = stateManager.getStates(ModLoadingPhase.LOAD);
-        var progress = StartupMessageManager.addProgressBar("Mod Loading", stateList.stream().mapToInt(mls -> mls.size().applyAsInt(modList)).sum());
-        for (IModLoadingState mls : stateList) {
-            dispatchAndHandleError(mls, syncExecutor, parallelExecutor, periodicTask, progress);
-        }
-        progress.complete();
+        statusConsumer.ifPresent(c->c.accept("Performing load phase"));
+        stateManager.getStates(ModLoadingPhase.LOAD).forEach(mls->dispatchAndHandleError(mls, syncExecutor, parallelExecutor, periodicTask));
+        statusConsumer.ifPresent(c->c.accept("Mod setup complete"));
     }
 
     public void finishMods(final ModWorkManager.DrivenExecutor syncExecutor, final Executor parallelExecutor, final Runnable periodicTask) {
-        var stateList = stateManager.getStates(ModLoadingPhase.COMPLETE);
-        var progress = StartupMessageManager.addProgressBar("Mod Complete", stateList.stream().mapToInt(mls -> mls.size().applyAsInt(modList)).sum());
-        for (IModLoadingState mls : stateList) {
-            dispatchAndHandleError(mls, syncExecutor, parallelExecutor, periodicTask, progress);
-        }
-        statusConsumer.accept(String.format("Mod loading complete - %d mods loaded", this.modList.size()));
-        progress.complete();
+        statusConsumer.ifPresent(c->c.accept("Performing completion phase"));
+        stateManager.getStates(ModLoadingPhase.COMPLETE).forEach(mls->dispatchAndHandleError(mls, syncExecutor, parallelExecutor, periodicTask));
+        statusConsumer.ifPresent(c->c.accept(String.format("Mod loading complete - %d mods loaded", this.modList.size())));
     }
 
-    private void dispatchAndHandleError(IModLoadingState state, ModWorkManager.DrivenExecutor syncExecutor, Executor parallelExecutor, final Runnable ticker, final ProgressMeter progressBar) {
+    private void dispatchAndHandleError(IModLoadingState state, ModWorkManager.DrivenExecutor syncExecutor, Executor parallelExecutor, final Runnable ticker) {
         if (!isLoadingStateValid()) {
             LOGGER.error("Cowardly refusing to process mod state change request from {}", state);
             return;
         }
-        progressBar.label(progressBar.name() + " working");
-        syncExecutor.drive(ticker);
-
-        var inlineRunnable = state.inlineRunnable().orElse(null);
-        if (inlineRunnable != null) handleInlineTransition(inlineRunnable, state, syncExecutor, ticker);
-
-        var transition = state.buildTransition(syncExecutor, parallelExecutor, progressBar).orElse(null);
-        if (transition != null) waitForTransition(state, syncExecutor, ticker, transition);
-
-        completedStates.add(state);
+        statusConsumer.ifPresent(c->c.accept(state.message().apply(this.modList)));
+        state.inlineRunnable().ifPresent(a->a.accept(this.modList));
+        state.buildTransition(syncExecutor, parallelExecutor).ifPresent(t->waitForTransition(state, syncExecutor, ticker, t));
     }
 
-    private void handleInlineTransition(final Consumer<ModList> transition, final IModLoadingState state, final ModWorkManager.DrivenExecutor syncExecutor, final Runnable ticker) {
-        var pb = StartupMessageManager.addProgressBar("State transition " +state.name()+" running", 0);
-        syncExecutor.drive(ticker);
-        transition.accept(this.modList);
-        syncExecutor.drive(ticker);
-        pb.complete();
-        syncExecutor.drive(ticker);
+    private void dispatchAndHandleError(IModLoadingState state, ModWorkManager.DrivenExecutor syncExecutor, Executor parallelExecutor, final Runnable ticker, Function<Executor, CompletableFuture<Void>> preSyncTask, Function<Executor, CompletableFuture<Void>> postSyncTask) {
+        if (!isLoadingStateValid()) {
+            LOGGER.error("Cowardly refusing to process mod state change request from {}", state);
+            return;
+        }
+        statusConsumer.ifPresent(c->c.accept(state.message().apply(this.modList)));
+        state.inlineRunnable().ifPresent(a->a.accept(this.modList));
+        state.buildTransition(syncExecutor, parallelExecutor, preSyncTask, postSyncTask).ifPresent(t->waitForTransition(state, syncExecutor, ticker, t));
     }
 
-    private void waitForTransition(final IModLoadingState state, final ModWorkManager.DrivenExecutor syncExecutor, final Runnable ticker, final CompletableFuture<Void> transition) {
+    private void waitForTransition(final IModLoadingState state, final ModWorkManager.DrivenExecutor syncExecutor, final Runnable ticker, final CompletableFuture<List<Throwable>> transition) {
         while (!transition.isDone()) {
             syncExecutor.drive(ticker);
         }
-
         try {
             transition.join();
         } catch (CompletionException e) {
             loadingStateValid = false;
             Throwable t = e.getCause();
-            boolean hasNotModLoadingEx = Arrays.stream(t.getSuppressed())
-                    .anyMatch(obj -> !(obj instanceof ModLoadingException));
-            if (hasNotModLoadingEx) {
+            final List<Throwable> notModLoading = Arrays.stream(t.getSuppressed())
+                    .filter(obj -> !(obj instanceof ModLoadingException))
+                    .collect(Collectors.toList());
+            if (!notModLoading.isEmpty()) {
                 LOGGER.fatal("Encountered non-modloading exceptions!", e);
-                statusConsumer.accept("ERROR DURING MOD LOADING");
                 throw e;
             }
 
             final List<ModLoadingException> modLoadingExceptions = Arrays.stream(t.getSuppressed())
                     .filter(ModLoadingException.class::isInstance)
                     .map(ModLoadingException.class::cast)
-                    .toList();
+                    .collect(Collectors.toList());
             LOGGER.fatal(LOADING,"Failed to complete lifecycle event {}, {} errors found", state.name(), modLoadingExceptions.size());
-            statusConsumer.accept("ERROR DURING MOD LOADING");
             throw new LoadingFailedException(modLoadingExceptions);
         }
     }
 
-    private List<ModContainer> buildMods(final IModFile modFile) {
-        final Map<String, IModInfo> modInfoMap = new HashMap<>();
-        for (var mod : modFile.getModFileInfo().getMods())
-            modInfoMap.put(mod.getModId(), mod);
+    private List<ModContainer> buildMods(final ModFile modFile)
+    {
+        final Map<String, IModInfo> modInfoMap = modFile.getModFileInfo().getMods().stream().collect(Collectors.toMap(IModInfo::getModId, Function.identity()));
 
         LOGGER.trace(LOADING, "ModContainer is {}", ModContainer.class.getClassLoader());
-        final List<ModContainer> containers = new ArrayList<>();
-        for (var entry : modFile.getScanResult().getTargets().entrySet()) {
-            var container = buildModContainerFromTOML(modFile, modInfoMap, entry.getKey(), entry.getValue());
-            if (container != null)
-                containers.add(container);
-        }
-
+        final List<ModContainer> containers = modFile.getScanResult().getTargets()
+                .entrySet()
+                .stream()
+                .map(e -> buildModContainerFromTOML(modFile, modInfoMap, e))
+                .filter(Objects::nonNull)
+                .collect(Collectors.toList());
         if (containers.size() != modInfoMap.size()) {
-            var modIds = modInfoMap.values().stream().map(IModInfo::getModId).sorted().toList();
-            var containerIds = containers.stream().map(c -> c != null ? c.getModId() : "(null)").sorted().toList();
-
-            LOGGER.fatal(LOADING, "File {} constructed {} mods: {}, but had {} mods specified: {}",
+            LOGGER.fatal(LOADING,"File {} constructed {} mods: {}, but had {} mods specified: {}",
                     modFile.getFilePath(),
-                    containers.size(), containerIds,
-                    modInfoMap.size(), modIds);
-
-            var missingClasses = new ArrayList<>(modIds);
-            missingClasses.removeAll(containerIds);
-            LOGGER.fatal(LOADING, "The following classes are missing, but are reported in the mods.toml: {}", missingClasses);
-
-            var missingMods = new ArrayList<>(containerIds);
-            missingMods.removeAll(modIds);
-            LOGGER.fatal(LOADING, "The following mods are missing, but have classes in the jar: {}", missingMods);
-
+                    containers.size(), containers.stream().map(c -> c != null ? c.getModId() : "(null)").sorted().collect(Collectors.toList()),
+                    modInfoMap.size(), modInfoMap.values().stream().map(IModInfo::getModId).sorted().collect(Collectors.toList()));
             loadingExceptions.add(new ModLoadingException(null, ModLoadingStage.CONSTRUCT, "fml.modloading.missingclasses", null, modFile.getFilePath()));
         }
-
         // remove errored mod containers
-        return containers.stream().filter(mc -> mc.modLoadingStage != ModLoadingStage.ERROR).toList();
+        return containers.stream().filter(mc -> mc.modLoadingStage != ModLoadingStage.ERROR).collect(Collectors.toList());
     }
 
-    private ModContainer buildModContainerFromTOML(final IModFile modFile, final Map<String, IModInfo> modInfoMap,
-        final String modId, final IModLanguageProvider.IModLanguageLoader languageLoader
-    ) {
+    private ModContainer buildModContainerFromTOML(final ModFile modFile, final Map<String, IModInfo> modInfoMap, final Map.Entry<String, ? extends IModLanguageProvider.IModLanguageLoader> idToProviderEntry) {
         try {
-            IModInfo info = modInfoMap.get(modId);
-            // throw a missing metadata error if there is no matching modid in the modInfoMap from the mods.toml file
-            if (info == null)
-                throw new ModLoadingException(null, ModLoadingStage.CONSTRUCT, "fml.modloading.missingmetadata", null, modId);
-
+            final String modId = idToProviderEntry.getKey();
+            final IModLanguageProvider.IModLanguageLoader languageLoader = idToProviderEntry.getValue();
+            IModInfo info = Optional.ofNullable(modInfoMap.get(modId)).
+                    // throw a missing metadata error if there is no matching modid in the modInfoMap from the mods.toml file
+                    orElseThrow(()->new ModLoadingException(null, ModLoadingStage.CONSTRUCT, "fml.modloading.missingmetadata", null, modId));
             return languageLoader.loadMod(info, modFile.getScanResult(), FMLLoader.getGameLayer());
         } catch (ModLoadingException mle) {
             // exceptions are caught and added to the error list for later handling
@@ -349,12 +279,7 @@ public class ModLoader {
      * and don't want to cause extraneous crashes due to trying to do things that aren't possible in a "broken load"
      */
     public static boolean isLoadingStateValid() {
-        return loadingStateValid;
-    }
-
-    public boolean hasCompletedState(final String stateName) {
-        IModLoadingState state = stateManager.findState(stateName);
-        return completedStates.contains(state);
+        return get().loadingStateValid;
     }
 
     public <T extends Event & IModBusEvent> void runEventGenerator(Function<ModContainer, T> generator) {
@@ -362,7 +287,7 @@ public class ModLoader {
             LOGGER.error("Cowardly refusing to send event generator to a broken mod state");
             return;
         }
-        ModList.get().forEachModInOrder(mc -> mc.acceptEvent(generator.apply(mc)));
+        ModList.get().forEachModContainer((id, mc) -> mc.acceptEvent(generator.apply(mc)));
     }
 
     public <T extends Event & IModBusEvent> void postEvent(T e) {
@@ -370,43 +295,16 @@ public class ModLoader {
             LOGGER.error("Cowardly refusing to send event {} to a broken mod state", e.getClass().getName());
             return;
         }
-        ModList.get().forEachModInOrder(mc -> mc.acceptEvent(e));
+        ModList.get().forEachModContainer((id, mc) -> mc.acceptEvent(e));
     }
 
-    public <T extends Event & IModBusEvent> T postEventWithReturn(T e) {
-        if (!loadingStateValid) {
-            LOGGER.error("Cowardly refusing to send event {} to a broken mod state", e.getClass().getName());
-            return e;
-        }
-        ModList.get().forEachModInOrder(mc -> mc.acceptEvent(e));
-        return e;
-    }
-
-    @SuppressWarnings("removal")
-    public <T extends Event & IModBusEvent> void postEventWrapContainerInModOrder(T event) {
-        postEventWithWrapInModOrder(event,
-            (mc, e) -> ModLoadingContext.get().setActiveContainer(mc),
-            (mc, e) -> ModLoadingContext.get().setActiveContainer(null)
-        );
-    }
-
-    public <T extends Event & IModBusEvent> void postEventWithWrapInModOrder(T e, BiConsumer<ModContainer, T> pre, BiConsumer<ModContainer, T> post) {
-        if (!loadingStateValid) {
-            LOGGER.error("Cowardly refusing to send event {} to a broken mod state", e.getClass().getName());
-            return;
-        }
-        ModList.get().forEachModInOrder(mc -> {
-            pre.accept(mc, e);
-            mc.acceptEvent(e);
-            post.accept(mc, e);
-        });
-    }
-
-    public List<ModLoadingWarning> getWarnings() {
+    public List<ModLoadingWarning> getWarnings()
+    {
         return ImmutableList.copyOf(this.loadingWarnings);
     }
 
-    public void addWarning(ModLoadingWarning warning) {
+    public void addWarning(ModLoadingWarning warning)
+    {
         this.loadingWarnings.add(warning);
     }
 

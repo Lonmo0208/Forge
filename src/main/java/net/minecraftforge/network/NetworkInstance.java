@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Forge Development LLC and contributors
+ * Minecraft Forge - Forge Development LLC
  * SPDX-License-Identifier: LGPL-2.1-only
  */
 
@@ -7,59 +7,50 @@ package net.minecraftforge.network;
 
 import net.minecraft.network.Connection;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraftforge.event.network.CustomPayloadEvent;
 import net.minecraftforge.eventbus.api.BusBuilder;
 import net.minecraftforge.eventbus.api.Event;
 import net.minecraftforge.eventbus.api.IEventBus;
 import net.minecraftforge.eventbus.api.IEventListener;
-import net.minecraftforge.network.Channel.VersionTest;
 
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
+import java.util.List;
 import java.util.function.Consumer;
-import java.util.function.Function;
-import org.jetbrains.annotations.ApiStatus;
+import java.util.function.Predicate;
+import java.util.function.Supplier;
 
-import io.netty.util.AttributeKey;
+public class NetworkInstance
+{
+    public ResourceLocation getChannelName()
+    {
+        return channelName;
+    }
 
-/**
- * This is essentially the shared common class for {@link SimpleChannel} and {@link EventNetworkChannel}.
- * I've now introduced {@link Channel} as that common modder facing base class. I am basically using this
- * as the internal API and {@link Channel} as the public.
- */
-@ApiStatus.Internal
-public final class NetworkInstance {
-    // We use an event bus here so that we don't have to have a handle(event) public function on Channel.
-    // Should this be changed so that modders can fire other channel's handlers?
-    private final IEventBus networkEventBus;
     private final ResourceLocation channelName;
-    private final int networkProtocolVersion;
-    final VersionTest clientAcceptedVersions;
-    final VersionTest serverAcceptedVersions;
-    final Map<AttributeKey<?>, Function<Connection, ?>> attributes;
-    final Consumer<Connection> channelHandler;
-    final ServerStatusPing.ChannelData pingData;
-    private final Set<ResourceLocation> ids = new HashSet<>();
+    private final String networkProtocolVersion;
+    private final Predicate<String> clientAcceptedVersions;
+    private final Predicate<String> serverAcceptedVersions;
+    private final IEventBus networkEventBus;
 
-    NetworkInstance(ResourceLocation channelName, int networkProtocolVersion,
-        VersionTest clientAcceptedVersions, VersionTest serverAcceptedVersions,
-        Map<AttributeKey<?>, Function<Connection, ?>> attributes, Consumer<Connection> channelHandler
-    ) {
+    NetworkInstance(ResourceLocation channelName, Supplier<String> networkProtocolVersion, Predicate<String> clientAcceptedVersions, Predicate<String> serverAcceptedVersions)
+    {
         this.channelName = channelName;
-        this.networkProtocolVersion = networkProtocolVersion;
+        this.networkProtocolVersion = networkProtocolVersion.get();
         this.clientAcceptedVersions = clientAcceptedVersions;
         this.serverAcceptedVersions = serverAcceptedVersions;
-        this.attributes = attributes;
-        this.channelHandler = channelHandler;
-        this.networkEventBus = BusBuilder.builder().setExceptionHandler(this::handleError).useModLauncher().build();
-        this.pingData = new ServerStatusPing.ChannelData(channelName, networkProtocolVersion, this.clientAcceptedVersions.accepts(VersionTest.Status.MISSING, -1));
+        this.networkEventBus = BusBuilder.builder().setExceptionHandler(this::handleError).build();
     }
 
-    private void handleError(IEventBus iEventBus, Event event, IEventListener[] iEventListeners, int i, Throwable throwable) {
+    private void handleError(IEventBus iEventBus, Event event, IEventListener[] iEventListeners, int i, Throwable throwable)
+    {
+
     }
 
-    public <T extends CustomPayloadEvent> void addListener(Consumer<T> eventListener) {
+    public <T extends NetworkEvent> void addListener(Consumer<T> eventListener)
+    {
+        this.networkEventBus.addListener(eventListener);
+    }
+
+    public void addGatherListener(Consumer<NetworkEvent.GatherLoginPayloadsEvent> eventListener)
+    {
         this.networkEventBus.addListener(eventListener);
     }
 
@@ -71,35 +62,39 @@ public final class NetworkInstance {
         this.networkEventBus.unregister(object);
     }
 
-    public boolean dispatch(CustomPayloadEvent event) {
-        this.networkEventBus.post(event);
-        return event.getSource().getPacketHandled();
+    boolean dispatch(final NetworkDirection side, final ICustomPacket<?> packet, final Connection manager)
+    {
+        final NetworkEvent.Context context = new NetworkEvent.Context(manager, side, packet.getIndex());
+        this.networkEventBus.post(side.getEvent(packet, () -> context));
+        return context.getPacketHandled();
     }
 
-    /**
-     * Registers another name that will have its CustomPayloadEvents redirected to this channel.
-     * Like the main name, this must be unique across all channels.
-     */
-    public NetworkInstance addChild(ResourceLocation name) {
-        NetworkRegistry.register(this, name);
-        this.ids.add(name);
-        return this;
-    }
-
-    ResourceLocation getChannelName() {
-        return channelName;
-    }
-
-    int getNetworkProtocolVersion() {
+    String getNetworkProtocolVersion() {
         return networkProtocolVersion;
     }
 
-    void registrationChange(ResourceLocation name, boolean registered) {
-        // TODO: Expose to listeners?
+    boolean tryServerVersionOnClient(final String serverVersion) {
+        return this.clientAcceptedVersions.test(serverVersion);
     }
 
-    boolean isRemotePresent(Connection con) {
-        var channels = NetworkContext.get(con).getRemoteChannels();
-        return channels.containsAll(ids);
+    boolean tryClientVersionOnServer(final String clientVersion) {
+        return this.serverAcceptedVersions.test(clientVersion);
+    }
+
+    void dispatchGatherLogin(final List<NetworkRegistry.LoginPayload> loginPayloadList, boolean isLocal) {
+        this.networkEventBus.post(new NetworkEvent.GatherLoginPayloadsEvent(loginPayloadList, isLocal));
+    }
+
+    void dispatchLoginPacket(final NetworkEvent.LoginPayloadEvent loginPayloadEvent) {
+        this.networkEventBus.post(loginPayloadEvent);
+    }
+
+    void dispatchEvent(final NetworkEvent networkEvent) {
+        this.networkEventBus.post(networkEvent);
+    }
+
+    public boolean isRemotePresent(Connection manager) {
+        ConnectionData connectionData = NetworkHooks.getConnectionData(manager);
+        return connectionData != null && connectionData.getChannels().containsKey(channelName);
     }
 }

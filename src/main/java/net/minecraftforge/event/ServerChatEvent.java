@@ -1,77 +1,61 @@
 /*
- * Copyright (c) Forge Development LLC and contributors
+ * Minecraft Forge - Forge Development LLC
  * SPDX-License-Identifier: LGPL-2.1-only
  */
 
 package net.minecraftforge.event;
 
-import java.util.Objects;
-import net.minecraft.network.chat.Component;
 import net.minecraft.network.protocol.game.ServerboundChatPacket;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.network.chat.Component;
+import net.minecraft.server.network.ServerGamePacketListenerImpl;
+import net.minecraftforge.common.ForgeHooks;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.eventbus.api.Cancelable;
-import net.minecraftforge.eventbus.api.Event;
-import net.minecraftforge.fml.LogicalSide;
-import org.jetbrains.annotations.ApiStatus;
 
 /**
- * This event is fired whenever a {@link ServerboundChatPacket} is received from a client
- * who has submitted their chat message.
- * <p>
- * This event is {@linkplain Cancelable cancellable}, and does not {@linkplain HasResult have a result}.
- * If the event is cancelled, the message will not be sent to clients.
- * <p>
- * This event is fired on the {@linkplain MinecraftForge#EVENT_BUS main Forge event bus},
- * only on the {@linkplain LogicalSide#SERVER logical server}.
+ * ServerChatEvent is fired whenever a C01PacketChatMessage is processed. <br>
+ * This event is fired via {@link ForgeHooks#onServerChatEvent(ServerGamePacketListenerImpl, String, Component)},
+ * which is executed by the {@link ServerGamePacketListenerImpl#handleChat(ServerboundChatPacket)}<br>
+ * <br>
+ * {@link #username} contains the username of the player sending the chat message.<br>
+ * {@link #message} contains the message being sent.<br>
+ * {@link #player} the instance of EntityPlayerMP for the player sending the chat message.<br>
+ * {@link #component} contains the instance of ChatComponentTranslation for the sent message.<br>
+ * <br>
+ * This event is {@link Cancelable}. <br>
+ * If this event is canceled, the chat message is never distributed to all clients.<br>
+ * <br>
+ * This event does not have a result. {@link HasResult}<br>
+ * <br>
+ * This event is fired on the {@link MinecraftForge#EVENT_BUS}.
  **/
 @Cancelable
-public class ServerChatEvent extends Event {
+public class ServerChatEvent extends net.minecraftforge.eventbus.api.Event
+{
+    private final String message, username;
     private final ServerPlayer player;
-    private final String username;
-    private final String rawText;
-    private Component message;
-
-    @ApiStatus.Internal
-    public ServerChatEvent(ServerPlayer player, String rawText, Component message) {
+    private Component component;
+    public ServerChatEvent(ServerPlayer player, String message, Component component)
+    {
+        super();
+        this.message = message;
         this.player = player;
         this.username = player.getGameProfile().getName();
-        this.rawText = rawText;
-        this.message = message;
+        this.component = component;
     }
 
-    /**
-     * {@return the player who initiated the chat action}
-     */
-    public ServerPlayer getPlayer() {
-        return this.player;
+    public void setComponent(Component e)
+    {
+        this.component = e;
     }
 
-    /**
-     * {@return the username of the player who initiated the chat action}
-     */
-    public String getUsername() {
-        return this.username;
+    public Component getComponent()
+    {
+        return this.component;
     }
 
-    /**
-     * {@return the original raw text of the player chat message}
-     */
-    public String getRawText() {
-        return this.rawText;
-    }
-
-    /**
-     * Set the message to be sent to the relevant clients.
-     */
-    public void setMessage(Component message) {
-        this.message = Objects.requireNonNull(message);
-    }
-
-    /**
-     * {@return the message that will be sent to the relevant clients, if the event is not cancelled}
-     */
-    public Component getMessage() {
-        return this.message;
-    }
+    public String getMessage() { return this.message; }
+    public String getUsername() { return this.username; }
+    public ServerPlayer getPlayer() { return this.player; }
 }

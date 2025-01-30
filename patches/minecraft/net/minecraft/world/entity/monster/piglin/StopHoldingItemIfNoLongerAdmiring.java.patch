@@ -1,11 +1,11 @@
 --- a/net/minecraft/world/entity/monster/piglin/StopHoldingItemIfNoLongerAdmiring.java
 +++ b/net/minecraft/world/entity/monster/piglin/StopHoldingItemIfNoLongerAdmiring.java
-@@ -11,7 +_,7 @@
-     public static BehaviorControl<Piglin> create() {
-         return BehaviorBuilder.create(
-             p_259197_ -> p_259197_.group(p_259197_.absent(MemoryModuleType.ADMIRING_ITEM)).apply(p_259197_, p_259512_ -> (p_359309_, p_359310_, p_359311_) -> {
--                        if (!p_359310_.getOffhandItem().isEmpty() && !p_359310_.getOffhandItem().is(Items.SHIELD)) {
-+                        if (!p_359310_.getOffhandItem().isEmpty() && !p_359310_.getOffhandItem().canPerformAction(net.minecraftforge.common.ToolActions.SHIELD_BLOCK)) {
-                             PiglinAi.stopHoldingOffHandItem(p_359309_, p_359310_, true);
-                             return true;
-                         } else {
+@@ -13,7 +_,7 @@
+    }
+ 
+    protected boolean m_6114_(ServerLevel p_35255_, E p_35256_) {
+-      return !p_35256_.m_21206_().m_41619_() && !p_35256_.m_21206_().m_150930_(Items.f_42740_);
++      return !p_35256_.m_21206_().m_41619_() && !p_35256_.m_21206_().canPerformAction(net.minecraftforge.common.ToolActions.SHIELD_BLOCK);
+    }
+ 
+    protected void m_6735_(ServerLevel p_35258_, E p_35259_, long p_35260_) {

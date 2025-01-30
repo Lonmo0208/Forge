@@ -1,118 +1,80 @@
 /*
- * Copyright (c) Forge Development LLC and contributors
- * SPDX-License-Identifier: LGPL-2.1-only
+ * Minecraft Forge
+ * Copyright (c) 2016-2021.
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation version 2.1
+ * of the License.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
 package net.minecraftforge.fml.loading.targets;
 
-import com.mojang.logging.LogUtils;
 import cpw.mods.modlauncher.api.ILaunchHandlerService;
-import cpw.mods.modlauncher.api.ServiceRunner;
-import net.minecraftforge.fml.loading.FMLLoader;
+import cpw.mods.modlauncher.api.ITransformingClassLoaderBuilder;
+import net.minecraftforge.fml.loading.LogMarkers;
 import net.minecraftforge.api.distmarker.Dist;
-import org.apache.logging.log4j.core.LoggerContext;
-import org.apache.logging.log4j.core.config.ConfigurationFactory;
-import org.apache.logging.log4j.core.config.ConfigurationSource;
-import org.apache.logging.log4j.core.config.Configurator;
-import org.slf4j.Logger;
-import java.io.IOException;
-import java.net.URI;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+
+import java.io.File;
 import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.function.BiPredicate;
+import java.util.stream.Collectors;
 
-/**
- * This is required by FMLLoader because ILaunchHandlerService doesn't have the context we need.
- * I need to clean this up to make proper api. But that involves editing ModLauncher itself which i'm not gunna do right now.
- *
- * So until that happens, guess this is public api.
- */
 public abstract class CommonLaunchHandler implements ILaunchHandlerService {
-    protected static final Logger LOGGER = LogUtils.getLogger();
+    public record LocatedPaths(List<Path> minecraftPaths, BiPredicate<String, String> minecraftFilter, List<List<Path>> otherModPaths, List<Path> otherArtifacts) {}
 
-    private final String name;
-    protected Dist dist = Dist.CLIENT;
-    protected boolean isData = false;
-    protected String module;
-    protected String main;
+    protected static final Logger LOGGER = LogManager.getLogger();
 
-    protected CommonLaunchHandler(LaunchType type, String prefix) {
-        this(prefix + type.name());
-        this.dist = type.dist();
-        this.isData = type.data();
-        this.module = type.module();
-        this.main = type.main();
-    }
+    public abstract Dist getDist();
 
-    protected CommonLaunchHandler(String name) {
-        this.name = name;
-    }
-
-    @Override public String name() { return this.name; }
-    public Dist getDist() { return this.dist; }
-    public boolean isData() { return this.isData; }
-    public boolean isProduction() { return false; }
     public abstract String getNaming();
 
-    public abstract List<Path> getMinecraftPaths();
-
-    protected String[] preLaunch(String[] arguments, ModuleLayer layer) {
-        URI uri;
-        try (var reader = layer.configuration().findModule("net.minecraftforge.fmlloader").orElseThrow().reference().open()) {
-            uri = reader.find("log4j2.xml").orElseThrow();
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-
-        // Force the log4j2 configuration to be loaded from fmlloader
-        Configurator.reconfigure(ConfigurationFactory.getInstance().getConfiguration(LoggerContext.getContext(), ConfigurationSource.fromUri(uri)));
-
-        return arguments;
+    public boolean isProduction() {
+        return false;
     }
+
+    public boolean isData() {
+        return false;
+    }
+
+    public abstract LocatedPaths getMinecraftPaths();
 
     @Override
-    public ServiceRunner launchService(final String[] arguments, final ModuleLayer gameLayer) {
-        FMLLoader.beforeStart(gameLayer);
-        return makeService(arguments, gameLayer);
+    public void configureTransformationClassLoader(final ITransformingClassLoaderBuilder builder) {
+
     }
 
-    protected ServiceRunner makeService(final String[] arguments, final ModuleLayer gameLayer) {
-        return () -> runTarget(this.module, this.main, arguments, gameLayer);
-    }
+    protected final Map<String, List<Path>> getModClasses() {
+        final String modClasses = Optional.ofNullable(System.getenv("MOD_CLASSES")).orElse("");
+        LOGGER.debug(LogMarkers.CORE, "Got mod coordinates {} from env", modClasses);
 
-    protected record LaunchType(String name, String module, String main, Dist dist, boolean data) {};
-    protected static final LaunchType CLIENT          = new LaunchType("client", "minecraft", "net.minecraft.client.main.Main", Dist.CLIENT, false);
-    protected static final LaunchType CLIENT_DATA     = new LaunchType("client_data", "minecraft", "net.minecraft.client.data.Main", Dist.CLIENT, true);
-    protected static final LaunchType DATA            = new LaunchType("data",   "minecraft", "net.minecraft.data.Main", Dist.CLIENT, true);
-    protected static final LaunchType SERVER          = new LaunchType("server", "minecraft", "net.minecraft.server.Main", Dist.DEDICATED_SERVER, false);
-    protected static final LaunchType SERVER_GAMETEST = new LaunchType("server_gametest", "net.minecraftforge.forge", "net.minecraftforge.gametest.GameTestMain", Dist.DEDICATED_SERVER, false);
+        record ExplodedModPath(String modid, Path path) {}
+        // "a/b/;c/d/;" -> "modid%%c:\fish\pepper;modid%%c:\fish2\pepper2\;modid2%%c:\fishy\bums;modid2%%c:\hmm"
+        final var modClassPaths = Arrays.stream(modClasses.split(File.pathSeparator))
+                .map(inp -> inp.split("%%", 2))
+                .map(splitString -> new ExplodedModPath(splitString.length == 1 ? "defaultmodid" : splitString[0], Paths.get(splitString[splitString.length - 1])))
+                .collect(Collectors.groupingBy(ExplodedModPath::modid, Collectors.mapping(ExplodedModPath::path, Collectors.toList())));
 
-    protected void runTarget(String module, String target, final String[] arguments, final ModuleLayer layer) throws Throwable {
-        var mod = layer.findModule(module).orElse(null);
-        if (mod == null) throw new IllegalStateException("Could not find module " + module);
-        var cls = Class.forName(mod, target);
-        if (cls == null) throw new IllegalStateException("Could not find class " + target + " in module " + module);
-        var mtd = cls.getMethod("main", String[].class);
-        if (mtd == null) throw new IllegalStateException("Class " + target + " in module " + module + " does not have a main(String[]) method");
-        mtd.invoke(null, (Object)arguments);
-    }
+        LOGGER.debug(LogMarkers.CORE, "Found supplied mod coordinates [{}]", modClassPaths);
 
-    protected static Path getPathFromResource(String resource) {
-        return getPathFromResource(resource, ForgeDevLaunchHandler.class.getClassLoader());
-    }
-
-    protected static Path getPathFromResource(String resource, ClassLoader cl) {
-        var url = cl.getResource(resource);
-        if (url == null)
-            throw new IllegalStateException("Could not find " + resource + " in classloader " + cl);
-
-        var str = url.toString();
-        int len = resource.length();
-        if ("jar".equalsIgnoreCase(url.getProtocol())) {
-            str = url.getFile();
-            len += 2;
-        }
-        str = str.substring(0, str.length() - len);
-        var path = Path.of(URI.create(str));
-        return path;
+        //final var explodedTargets = ((Map<String, List<ExplodedDirectoryLocator.ExplodedMod>>)arguments).computeIfAbsent("explodedTargets", a -> new ArrayList<>());
+        //modClassPaths.forEach((modlabel,paths) -> explodedTargets.add(new ExplodedDirectoryLocator.ExplodedMod(modlabel, paths)));
+        return modClassPaths;
     }
 }

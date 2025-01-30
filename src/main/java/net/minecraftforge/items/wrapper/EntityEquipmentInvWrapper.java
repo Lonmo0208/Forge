@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Forge Development LLC and contributors
+ * Minecraft Forge - Forge Development LLC
  * SPDX-License-Identifier: LGPL-2.1-only
  */
 
@@ -13,15 +13,17 @@ import net.minecraftforge.common.util.LazyOptional;
 import net.minecraftforge.items.IItemHandler;
 import net.minecraftforge.items.IItemHandlerModifiable;
 import net.minecraftforge.items.ItemHandlerHelper;
-import org.jetbrains.annotations.NotNull;
 import java.util.ArrayList;
 import java.util.List;
+import javax.annotation.Nonnull;
+
 
 /**
  * Exposes the armor or hands inventory of an {@link LivingEntity} as an {@link IItemHandler} using {@link LivingEntity#getItemBySlot(EquipmentSlot)} and
  * {@link LivingEntity#setItemSlot(EquipmentSlot, ItemStack)}.
  */
-public abstract class EntityEquipmentInvWrapper implements IItemHandlerModifiable {
+public abstract class EntityEquipmentInvWrapper implements IItemHandlerModifiable
+{
     /**
      * The entity.
      */
@@ -36,25 +38,17 @@ public abstract class EntityEquipmentInvWrapper implements IItemHandlerModifiabl
      * @param entity   The entity.
      * @param slotType The slot type to expose.
      */
-    public EntityEquipmentInvWrapper(final LivingEntity entity, final EquipmentSlot.Type mainType) {
-        this(entity, mainType, (EquipmentSlot.Type[])null);
-    }
-
-    public EntityEquipmentInvWrapper(final LivingEntity entity, final EquipmentSlot.Type mainType, final EquipmentSlot.Type... types) {
+    public EntityEquipmentInvWrapper(final LivingEntity entity, final EquipmentSlot.Type slotType)
+    {
         this.entity = entity;
 
-        var slots = new ArrayList<EquipmentSlot>();
+        final List<EquipmentSlot> slots = new ArrayList<EquipmentSlot>();
 
-        for (var slot : EquipmentSlot.values()) {
-            if (slot.getType() == mainType)
+        for (final EquipmentSlot slot : EquipmentSlot.values())
+        {
+            if (slot.getType() == slotType)
+            {
                 slots.add(slot);
-            else if (types != null && types.length > 0) {
-                for (var type : types) {
-                    if (slot.getType() == type) {
-                        slots.add(slot);
-                        break;
-                    }
-                }
             }
         }
 
@@ -62,19 +56,22 @@ public abstract class EntityEquipmentInvWrapper implements IItemHandlerModifiabl
     }
 
     @Override
-    public int getSlots() {
+    public int getSlots()
+    {
         return slots.size();
     }
 
-    @NotNull
+    @Nonnull
     @Override
-    public ItemStack getStackInSlot(final int slot) {
+    public ItemStack getStackInSlot(final int slot)
+    {
         return entity.getItemBySlot(validateSlotIndex(slot));
     }
 
-    @NotNull
+    @Nonnull
     @Override
-    public ItemStack insertItem(final int slot, @NotNull final ItemStack stack, final boolean simulate) {
+    public ItemStack insertItem(final int slot, @Nonnull final ItemStack stack, final boolean simulate)
+    {
         if (stack.isEmpty())
             return ItemStack.EMPTY;
 
@@ -84,7 +81,8 @@ public abstract class EntityEquipmentInvWrapper implements IItemHandlerModifiabl
 
         int limit = getStackLimit(slot, stack);
 
-        if (!existing.isEmpty()) {
+        if (!existing.isEmpty())
+        {
             if (!ItemHandlerHelper.canItemStacksStack(stack, existing))
                 return stack;
 
@@ -96,19 +94,25 @@ public abstract class EntityEquipmentInvWrapper implements IItemHandlerModifiabl
 
         boolean reachedLimit = stack.getCount() > limit;
 
-        if (!simulate) {
+        if (!simulate)
+        {
             if (existing.isEmpty())
+            {
                 entity.setItemSlot(equipmentSlot, reachedLimit ? ItemHandlerHelper.copyStackWithSize(stack, limit) : stack);
+            }
             else
+            {
                 existing.grow(reachedLimit ? limit : stack.getCount());
+            }
         }
 
         return reachedLimit ? ItemHandlerHelper.copyStackWithSize(stack, stack.getCount() - limit) : ItemStack.EMPTY;
     }
 
-    @NotNull
+    @Nonnull
     @Override
-    public ItemStack extractItem(final int slot, final int amount, final boolean simulate) {
+    public ItemStack extractItem(final int slot, final int amount, final boolean simulate)
+    {
         if (amount == 0)
             return ItemStack.EMPTY;
 
@@ -121,31 +125,41 @@ public abstract class EntityEquipmentInvWrapper implements IItemHandlerModifiabl
 
         final int toExtract = Math.min(amount, existing.getMaxStackSize());
 
-        if (existing.getCount() <= toExtract) {
+        if (existing.getCount() <= toExtract)
+        {
             if (!simulate)
+            {
                 entity.setItemSlot(equipmentSlot, ItemStack.EMPTY);
+            }
 
             return existing;
-        } else {
+        }
+        else
+        {
             if (!simulate)
+            {
                 entity.setItemSlot(equipmentSlot, ItemHandlerHelper.copyStackWithSize(existing, existing.getCount() - toExtract));
+            }
 
             return ItemHandlerHelper.copyStackWithSize(existing, toExtract);
         }
     }
 
     @Override
-    public int getSlotLimit(final int slot) {
+    public int getSlotLimit(final int slot)
+    {
         final EquipmentSlot equipmentSlot = validateSlotIndex(slot);
-        return (equipmentSlot.getType() == EquipmentSlot.Type.HUMANOID_ARMOR || equipmentSlot.getType() == EquipmentSlot.Type.ANIMAL_ARMOR) ? 1 : 64;
+        return equipmentSlot.getType() == EquipmentSlot.Type.ARMOR ? 1 : 64;
     }
 
-    protected int getStackLimit(final int slot, @NotNull final ItemStack stack) {
+    protected int getStackLimit(final int slot, @Nonnull final ItemStack stack)
+    {
         return Math.min(getSlotLimit(slot), stack.getMaxStackSize());
     }
 
     @Override
-    public void setStackInSlot(final int slot, @NotNull final ItemStack stack) {
+    public void setStackInSlot(final int slot, @Nonnull final ItemStack stack)
+    {
         final EquipmentSlot equipmentSlot = validateSlotIndex(slot);
         if (ItemStack.matches(entity.getItemBySlot(equipmentSlot), stack))
             return;
@@ -153,21 +167,23 @@ public abstract class EntityEquipmentInvWrapper implements IItemHandlerModifiabl
     }
 
     @Override
-    public boolean isItemValid(int slot, @NotNull ItemStack stack) {
+    public boolean isItemValid(int slot, @Nonnull ItemStack stack)
+    {
         return true;
     }
 
-    protected EquipmentSlot validateSlotIndex(final int slot) {
+    protected EquipmentSlot validateSlotIndex(final int slot)
+    {
         if (slot < 0 || slot >= slots.size())
             throw new IllegalArgumentException("Slot " + slot + " not in valid range - [0," + slots.size() + ")");
 
         return slots.get(slot);
     }
 
-    public static LazyOptional<IItemHandlerModifiable>[] create(LivingEntity entity) {
+    public static LazyOptional<IItemHandlerModifiable>[] create(LivingEntity entity)
+    {
         @SuppressWarnings("unchecked")
         LazyOptional<IItemHandlerModifiable>[] ret = new LazyOptional[3];
-
         ret[0] = LazyOptional.of(() -> new EntityHandsInvWrapper(entity));
         ret[1] = LazyOptional.of(() -> new EntityArmorInvWrapper(entity));
         ret[2] = LazyOptional.of(() -> new CombinedInvWrapper(ret[0].orElse(null), ret[1].orElse(null)));

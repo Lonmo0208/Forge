@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Forge Development LLC and contributors
+ * Minecraft Forge - Forge Development LLC
  * SPDX-License-Identifier: LGPL-2.1-only
  */
 
@@ -12,7 +12,8 @@ import net.minecraftforge.eventbus.api.Cancelable;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
-import org.jetbrains.annotations.NotNull;
+
+import javax.annotation.Nonnull;
 
 /**
  * ArrowLooseEvent is fired when a player stops using a bow.<br>
@@ -24,7 +25,6 @@ import org.jetbrains.annotations.NotNull;
  * <br>
  * This event is {@link Cancelable}.<br>
  * If this event is canceled, the player does not stop using the bow.<br>
- * For crossbows, the charge will always be 1; Set it to -1 in order to prevent firing the arrow. <br>
  * <br>
  * This event does not have a result. {@link HasResult}<br>
  * <br>
@@ -34,22 +34,22 @@ import org.jetbrains.annotations.NotNull;
 public class ArrowLooseEvent extends PlayerEvent
 {
     private final ItemStack bow;
-    private final Level level;
+    private final Level world;
     private final boolean hasAmmo;
     private int charge;
 
-    public ArrowLooseEvent(Player player, @NotNull ItemStack bow, Level level, int charge, boolean hasAmmo)
+    public ArrowLooseEvent(Player player, @Nonnull ItemStack bow, Level world, int charge, boolean hasAmmo)
     {
         super(player);
         this.bow = bow;
-        this.level = level;
+        this.world = world;
         this.charge = charge;
         this.hasAmmo = hasAmmo;
     }
 
-    @NotNull
+    @Nonnull
     public ItemStack getBow() { return this.bow; }
-    public Level getLevel() { return this.level; }
+    public Level getWorld() { return this.world; }
     public boolean hasAmmo() { return this.hasAmmo; }
     public int getCharge() { return this.charge; }
     public void setCharge(int charge) { this.charge = charge; }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Forge Development LLC and contributors
+ * Minecraft Forge - Forge Development LLC
  * SPDX-License-Identifier: LGPL-2.1-only
  */
 
@@ -24,16 +24,16 @@ import java.util.Set;
  *
  * @param <V> The top level type for the registry
  */
-public interface IForgeRegistry<V> extends Iterable<V> {
+public interface IForgeRegistry<V extends IForgeRegistryEntry<V>> extends Iterable<V>
+{
     ResourceKey<Registry<V>> getRegistryKey();
     ResourceLocation getRegistryName();
+    Class<V> getRegistrySuperType();
 
-    /**
-     * The supplied string key will be prefixed with the currently active mod's mod id.
-     * If the supplied name already has a prefix that is different, it will be used and a warning will be logged.
-     */
-    void register(String key, V value);
-    void register(ResourceLocation key, V value);
+    void register(V value);
+
+    @SuppressWarnings("unchecked")
+    void registerAll(V... values);
 
     boolean containsKey(ResourceLocation key);
     boolean containsValue(V value);
@@ -76,13 +76,6 @@ public interface IForgeRegistry<V> extends Iterable<V> {
      */
     @Nullable ITagManager<V> tags();
 
-    @NotNull Optional<Holder.Reference<V>> getDelegate(ResourceKey<V> rkey);
-    @NotNull Holder.Reference<V> getDelegateOrThrow(ResourceKey<V> rkey);
-    @NotNull Optional<Holder.Reference<V>> getDelegate(ResourceLocation key);
-    @NotNull Holder.Reference<V> getDelegateOrThrow(ResourceLocation key);
-    @NotNull Optional<Holder.Reference<V>> getDelegate(V value);
-    @NotNull Holder.Reference<V> getDelegateOrThrow(V value);
-
     /**
      * Retrieve the slave map of type T from the registry.
      * Slave maps are maps which are dependent on registry content in some way.
@@ -91,15 +84,16 @@ public interface IForgeRegistry<V> extends Iterable<V> {
      * @param <T> Type to return
      * @return The slavemap if present
      */
-    <T> T getSlaveMap(SlaveKey<T> key);
+    <T> T getSlaveMap(ResourceLocation slaveMapName, Class<T> type);
 
     /**
      * Callback fired when objects are added to the registry. This will fire when the registry is rebuilt
      * on the client side from a server side synchronization, or when a world is loaded.
      */
     @FunctionalInterface
-    interface AddCallback<V> {
-        void onAdd(IForgeRegistryInternal<V> owner, RegistryManager stage, int id, ResourceKey<V> key, V obj, @Nullable V oldObj);
+    interface AddCallback<V extends IForgeRegistryEntry<V>>
+    {
+        void onAdd(IForgeRegistryInternal<V> owner, RegistryManager stage, int id, V obj, @Nullable V oldObj);
     }
 
     /**
@@ -107,7 +101,8 @@ public interface IForgeRegistry<V> extends Iterable<V> {
      * or server.
      */
     @FunctionalInterface
-    interface ClearCallback<V> {
+    interface ClearCallback<V extends IForgeRegistryEntry<V>>
+    {
         void onClear(IForgeRegistryInternal<V> owner, RegistryManager stage);
     }
 
@@ -115,7 +110,8 @@ public interface IForgeRegistry<V> extends Iterable<V> {
      * Callback fired when a registry instance is created. Populate slave maps here.
      */
     @FunctionalInterface
-    interface CreateCallback<V> {
+    interface CreateCallback<V extends IForgeRegistryEntry<V>>
+    {
         void onCreate(IForgeRegistryInternal<V> owner, RegistryManager stage);
     }
 
@@ -123,7 +119,8 @@ public interface IForgeRegistry<V> extends Iterable<V> {
      * Callback fired when the registry contents are validated.
      */
     @FunctionalInterface
-    interface ValidateCallback<V> {
+    interface ValidateCallback<V extends IForgeRegistryEntry<V>>
+    {
         void onValidate(IForgeRegistryInternal<V> owner, RegistryManager stage, int id, ResourceLocation key, V obj);
     }
 
@@ -131,22 +128,26 @@ public interface IForgeRegistry<V> extends Iterable<V> {
      * Callback fired when the registry is done processing. Used to calculate state ID maps.
      */
     @FunctionalInterface
-    interface BakeCallback<V> {
+    interface BakeCallback<V extends IForgeRegistryEntry<V>>
+    {
         void onBake(IForgeRegistryInternal<V> owner, RegistryManager stage);
     }
 
+    /**
+     * Factory for creating dummy entries, allowing worlds to be loaded and keep the missing block references.
+     */
     @FunctionalInterface
-    interface MissingFactory<V> {
-        V createMissing(ResourceLocation key, boolean isNetwork);
+    interface DummyFactory<V extends IForgeRegistryEntry<V>>
+    {
+        V createDummy(ResourceLocation key);
     }
 
-    public record SlaveKey<T>(ResourceLocation name) {
-        public static <X> SlaveKey<X> create(String name) {
-            return create(ResourceLocation.parse(name));
-        }
-
-        public static <X> SlaveKey<X> create(ResourceLocation name) {
-            return new SlaveKey<X>(name);
-        }
+    /**
+     *
+     */
+    @FunctionalInterface
+    interface MissingFactory<V extends IForgeRegistryEntry<V>>
+    {
+        V createMissing(ResourceLocation key, boolean isNetwork);
     }
 }

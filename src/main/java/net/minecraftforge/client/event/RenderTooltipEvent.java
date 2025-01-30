@@ -1,54 +1,52 @@
 /*
- * Copyright (c) Forge Development LLC and contributors
+ * Minecraft Forge - Forge Development LLC
  * SPDX-License-Identifier: LGPL-2.1-only
  */
 
 package net.minecraftforge.client.event;
 
-import com.mojang.datafixers.util.Either;
-import net.minecraft.client.gui.Font;
-import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.screens.inventory.tooltip.ClientTooltipComponent;
-import net.minecraft.client.gui.screens.inventory.tooltip.ClientTooltipPositioner;
-import net.minecraft.network.chat.FormattedText;
-import net.minecraft.resources.ResourceLocation;
-import net.minecraft.world.inventory.tooltip.TooltipComponent;
-import net.minecraft.world.item.ItemStack;
-import net.minecraftforge.common.MinecraftForge;
-import net.minecraftforge.event.entity.player.ItemTooltipEvent;
-import net.minecraftforge.eventbus.api.Cancelable;
-import net.minecraftforge.eventbus.api.Event;
-import net.minecraftforge.fml.LogicalSide;
-import org.jetbrains.annotations.ApiStatus;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
-
 import java.util.Collections;
 import java.util.List;
 
+import javax.annotation.Nonnull;
+
+import com.mojang.blaze3d.vertex.PoseStack;
+import com.mojang.datafixers.util.Either;
+import net.minecraft.client.gui.Font;
+import net.minecraft.client.gui.screens.inventory.tooltip.ClientTooltipComponent;
+import net.minecraft.world.inventory.tooltip.TooltipComponent;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.network.chat.FormattedText;
+import net.minecraftforge.eventbus.api.Cancelable;
+import net.minecraftforge.eventbus.api.Event;
+
 /**
- * Fired during tooltip rendering.
- * See the various subclasses for listening to specific events.
- *
- * @see RenderTooltipEvent.GatherComponents
- * @see RenderTooltipEvent.Pre
- * @see RenderTooltipEvent.Background
+ * A set of events which are fired at various points during tooltip rendering.
+ * <p>
+ * Can be used to change the rendering parameters, draw something extra, etc.
+ * <p>
+ * Do not use this event directly, use one of the subclasses:
+ * <ul>
+ * <li>{@link RenderTooltipEvent.Pre}</li>
+ * <li>{@link RenderTooltipEvent.GatherComponents}</li>
+ * <li>{@link RenderTooltipEvent.Color}</li>
+ * </ul>
  */
-public abstract class RenderTooltipEvent extends Event
+public abstract class RenderTooltipEvent extends net.minecraftforge.eventbus.api.Event
 {
-    @NotNull
+    @Nonnull
     protected final ItemStack itemStack;
-    protected final GuiGraphics graphics;
+    protected final PoseStack poseStack;
     protected int x;
     protected int y;
     protected Font font;
     protected final List<ClientTooltipComponent> components;
 
-    @ApiStatus.Internal
-    protected RenderTooltipEvent(@NotNull ItemStack itemStack, GuiGraphics graphics, int x, int y, @NotNull Font font, @NotNull List<ClientTooltipComponent> components)
+
+    public RenderTooltipEvent(@Nonnull ItemStack itemStack, PoseStack poseStack, int x, int y, @Nonnull Font font, @Nonnull List<ClientTooltipComponent> components)
     {
         this.itemStack = itemStack;
-        this.graphics = graphics;
+        this.poseStack = poseStack;
         this.components = Collections.unmodifiableList(components);
         this.x = x;
         this.y = y;
@@ -56,36 +54,33 @@ public abstract class RenderTooltipEvent extends Event
     }
 
     /**
-     * {@return the item stack which the tooltip is being rendered for, or an {@linkplain ItemStack#isEmpty() empty
-     * item stack} if there is no associated item stack}
+     * @return The stack which the tooltip is being rendered for. As tooltips can be drawn without itemstacks, this stack may be empty.
      */
-    @NotNull
+    @Nonnull
     public ItemStack getItemStack()
     {
         return itemStack;
     }
 
-    /**
-     * {@return the graphics helper for the gui}
-     */
-    public GuiGraphics getGraphics()
-    {
-        return this.graphics;
-    }
 
     /**
-     * {@return the unmodifiable list of tooltip components}
-     *
-     * <p>Use {@link ItemTooltipEvent} or {@link GatherComponents} to modify tooltip contents or components.</p>
+     * @return The PoseStack rendering context.
      */
-    @NotNull
+    public PoseStack getPoseStack() { return poseStack; }
+
+    /**
+     * The components to be drawn.
+     * To modify this list use {@link GatherComponents}.
+     * @return an unmodifiable list of tooltip components to be drawn.
+     */
+    @Nonnull
     public List<ClientTooltipComponent> getComponents()
     {
         return components;
     }
 
     /**
-     * {@return the X position of the tooltip box} By default, this is the mouse X position.
+     * @return The X position of the tooltip box. By default, the mouse X position.
      */
     public int getX()
     {
@@ -93,32 +88,27 @@ public abstract class RenderTooltipEvent extends Event
     }
 
     /**
-     * {@return the Y position of the tooltip box} By default, this is the mouse Y position.
+     * @return The Y position of the tooltip box. By default, the mouse Y position.
      */
     public int getY()
     {
         return y;
     }
-
+    
     /**
-     * {@return The font used to render the text}
+     * @return The {@link Font} instance the current render is using.
      */
-    @NotNull
+    @Nonnull
     public Font getFont()
     {
         return font;
     }
 
     /**
-     * Fired when a tooltip gathers the {@link TooltipComponent}s to be rendered, before any text wrapping or processing.
-     * The list of components and the maximum width of the tooltip can be modified through this event.
-     *
-     * <p>This event is {@linkplain Cancelable cancellable}, and does not {@linkplain HasResult have a result}.
-     * If this event is cancelled, then the list of components will be empty, causing the tooltip to not be rendered and
-     * the corresponding {@link RenderTooltipEvent.Pre} and {@link RenderTooltipEvent.Background} to not be fired.</p>
-     *
-     * <p>This event is fired on the {@linkplain MinecraftForge#EVENT_BUS main Forge event bus},
-     * only on the {@linkplain LogicalSide#CLIENT logical client}.</p>
+     * Fires when a tooltip gathers the {@link TooltipComponent}s to render. This event fires before any text wrapping
+     * or text processing.
+     * This event allows modifying the components to be rendered as well as specifying a maximum width for the tooltip.
+     * The maximum width will cause any text components to be wrapped.
      */
     @Cancelable
     public static class GatherComponents extends Event
@@ -129,7 +119,6 @@ public abstract class RenderTooltipEvent extends Event
         private final List<Either<FormattedText, TooltipComponent>> tooltipElements;
         private int maxWidth;
 
-        @ApiStatus.Internal
         public GatherComponents(ItemStack itemStack, int screenWidth, int screenHeight, List<Either<FormattedText, TooltipComponent>> tooltipElements, int maxWidth)
         {
             this.itemStack = itemStack;
@@ -140,8 +129,7 @@ public abstract class RenderTooltipEvent extends Event
         }
 
         /**
-         * {@return the item stack which the tooltip is being rendered for, or an {@linkplain ItemStack#isEmpty() empty
-         * item stack} if there is no associated item stack}
+         * @return the ItemStack whose tooltip is being rendered or an empty stack if this tooltip is not for a stack
          */
         public ItemStack getItemStack()
         {
@@ -149,9 +137,7 @@ public abstract class RenderTooltipEvent extends Event
         }
 
         /**
-         * {@return the width of the screen}.
-         * The lines of text within the tooltip are wrapped to be within the screen width, and the tooltip box itself
-         * is moved to be within the screen width.
+         * @return the width of the screen
          */
         public int getScreenWidth()
         {
@@ -159,8 +145,7 @@ public abstract class RenderTooltipEvent extends Event
         }
 
         /**
-         * {@return the height of the screen}
-         * The tooltip box is moved to be within the screen height.
+         * @return the height of the screen
          */
         public int getScreenHeight()
         {
@@ -168,8 +153,8 @@ public abstract class RenderTooltipEvent extends Event
         }
 
         /**
-         * {@return the modifiable list of elements to be rendered on the tooltip} These elements can be either
-         * formatted text or custom tooltip components.
+         * The elements to be rendered. These can be either formatted text or custom tooltip components.
+         * This list is modifiable.
          */
         public List<Either<FormattedText, TooltipComponent>> getTooltipElements()
         {
@@ -177,10 +162,7 @@ public abstract class RenderTooltipEvent extends Event
         }
 
         /**
-         * {@return the maximum width of the tooltip when being rendered}
-         *
-         * <p>A value of {@code -1} means an unlimited maximum width. However, an unlimited maximum width will still
-         * be wrapped to be within the screen bounds.</p>
+         * @return the current maximum width for the text components of the tooltip (or -1 for no maximum width)
          */
         public int getMaxWidth()
         {
@@ -188,9 +170,7 @@ public abstract class RenderTooltipEvent extends Event
         }
 
         /**
-         * Sets the maximum width of the tooltip. Use {@code -1} for unlimited maximum width.
-         *
-         * @param maxWidth the new maximum width
+         * Set the maximum width for the text components of the tooltip (or -1 for no maximum width)
          */
         public void setMaxWidth(int maxWidth)
         {
@@ -199,70 +179,43 @@ public abstract class RenderTooltipEvent extends Event
     }
 
     /**
-     * Fired <b>before</b> the tooltip is rendered.
-     * This can be used to modify the positioning and font of the tooltip.
-     *
-     * <p>This event is {@linkplain Cancelable cancellable}, and does not {@linkplain HasResult have a result}.
-     * If this event is cancelled, then the tooltip will not be rendered and the corresponding
-     * {@link RenderTooltipEvent.Background} will not be fired.</p>
-     *
-     * <p>This event is fired on the {@linkplain MinecraftForge#EVENT_BUS main Forge event bus},
-     * only on the {@linkplain LogicalSide#CLIENT logical client}.</p>
+     * This event is fired before any tooltip calculations are done. It provides setters for all aspects of the tooltip, so the final render can be modified.
+     * <p>
+     * This event is {@link Cancelable}.
      */
     @Cancelable
     public static class Pre extends RenderTooltipEvent
     {
-        private final int screenWidth;
-        private final int screenHeight;
-        private final ClientTooltipPositioner positioner;
+        private int screenWidth;
+        private int screenHeight;
 
-        @ApiStatus.Internal
-        public Pre(@NotNull ItemStack stack, GuiGraphics graphics, int x, int y, int screenWidth, int screenHeight, @NotNull Font font, @NotNull List<ClientTooltipComponent> components, @NotNull ClientTooltipPositioner positioner)
+        public Pre(@Nonnull ItemStack stack, PoseStack poseStack, int x, int y, int screenWidth, int screenHeight, @Nonnull Font font, @Nonnull List<ClientTooltipComponent> components)
         {
-            super(stack, graphics, x, y, font, components);
+            super(stack, poseStack, x, y, font, components);
             this.screenWidth = screenWidth;
             this.screenHeight = screenHeight;
-            this.positioner = positioner;
         }
 
-        /**
-         * {@return the width of the screen}.
-         * The lines of text within the tooltip are wrapped to be within the screen width, and the tooltip box itself
-         * is moved to be within the screen width.
-         */
         public int getScreenWidth()
         {
             return screenWidth;
         }
 
-        /**
-         * {@return the height of the screen}
-         * The tooltip box is moved to be within the screen height.
-         */
         public int getScreenHeight()
         {
             return screenHeight;
         }
 
-        public ClientTooltipPositioner getTooltipPositioner()
-        {
-            return positioner;
-        }
-
         /**
-         * Sets the font to be used to render text.
-         *
-         * @param fr the new font
+         * Sets the {@link Font} to be used to render text.
          */
-        public void setFont(@NotNull Font fr)
+        public void setFont(@Nonnull Font fr)
         {
             this.font = fr;
         }
 
         /**
-         * Sets the X origin of the tooltip.
-         *
-         * @param x the new X origin
+         * Set the X origin of the tooltip.
          */
         public void setX(int x)
         {
@@ -270,9 +223,7 @@ public abstract class RenderTooltipEvent extends Event
         }
 
         /**
-         * Sets the Y origin of the tooltip.
-         *
-         * @param y the new Y origin
+         * Set the Y origin of the tooltip.
          */
         public void setY(int y)
         {
@@ -281,44 +232,94 @@ public abstract class RenderTooltipEvent extends Event
     }
 
     /**
-     * Fired when the tooltip background prefix is determined.
-     * This can be used to modify the textures to be used for the tooltip background.
-     *
-     * <p>This event is not {@linkplain Cancelable cancellable}, and does not {@linkplain HasResult have a result}.</p>
-     *
-     * <p>This event is fired on the {@linkplain MinecraftForge#EVENT_BUS main Forge event bus},
-     * only on the {@linkplain LogicalSide#CLIENT logical client}.</p>
+     * This event is fired when the colours for the tooltip background are determined. 
      */
-    public static class Background extends RenderTooltipEvent {
-        private final ResourceLocation originalBackground;
-        private ResourceLocation background;
+    public static class Color extends RenderTooltipEvent
+    {
+        private final int originalBackground;
+        private final int originalBorderStart;
+        private final int originalBorderEnd;
+        private int backgroundStart;
+        private int backgroundEnd;
+        private int borderStart;
+        private int borderEnd;
 
-        @ApiStatus.Internal
-        public Background(@NotNull ItemStack stack, GuiGraphics graphics, int x, int y, @NotNull Font fr, @NotNull List<ClientTooltipComponent> components, @Nullable ResourceLocation background) {
-            super(stack, graphics, x, y, fr, components);
+        public Color(@Nonnull ItemStack stack, PoseStack poseStack, int x, int y, @Nonnull Font fr, int background, int borderStart, int borderEnd, @Nonnull List<ClientTooltipComponent> components)
+        {
+            super(stack, poseStack, x, y, fr, components);
             this.originalBackground = background;
-            this.background = background;
+            this.originalBorderStart = borderStart;
+            this.originalBorderEnd = borderEnd;
+            this.backgroundStart = background;
+            this.backgroundEnd = background;
+            this.borderStart = borderStart;
+            this.borderEnd = borderEnd;
         }
 
-        /**
-         * Sets the new prefix for the background texture
-         */
-        public void setBackground(ResourceLocation background) {
-            this.background = background;
+        public int getBackgroundStart()
+        {
+            return backgroundStart;
         }
 
-        /**
-         * @return the potentially modified background's prefix, can be null for default
-         */
-        public ResourceLocation getBackground() {
-            return this.background;
+        public int getBackgroundEnd()
+        {
+            return backgroundEnd;
         }
 
-        /**
-         * @return the original tooltip background's prefix, can be null for default
-         */
-        public ResourceLocation getOriginalBackground() {
+        public void setBackground(int background)
+        {
+            this.backgroundStart = background;
+            this.backgroundEnd = background;
+        }
+
+        public void setBackgroundStart(int backgroundStart)
+        {
+            this.backgroundStart = backgroundStart;
+        }
+
+        public void setBackgroundEnd(int backgroundEnd)
+        {
+            this.backgroundEnd = backgroundEnd;
+        }
+
+        public int getBorderStart()
+        {
+            return borderStart;
+        }
+
+        public void setBorderStart(int borderStart)
+        {
+            this.borderStart = borderStart;
+        }
+
+        public int getBorderEnd()
+        {
+            return borderEnd;
+        }
+
+        public void setBorderEnd(int borderEnd)
+        {
+            this.borderEnd = borderEnd;
+        }
+
+        public int getOriginalBackgroundStart()
+        {
             return originalBackground;
+        }
+
+        public int getOriginalBackgroundEnd()
+        {
+            return originalBackground;
+        }
+
+        public int getOriginalBorderStart()
+        {
+            return originalBorderStart;
+        }
+
+        public int getOriginalBorderEnd()
+        {
+            return originalBorderEnd;
         }
     }
 }

@@ -1,168 +1,34 @@
 --- a/net/minecraft/world/entity/Mob.java
 +++ b/net/minecraft/world/entity/Mob.java
-@@ -129,6 +_,9 @@
-     private Leashable.LeashData leashData;
-     private BlockPos restrictCenter = BlockPos.ZERO;
-     private float restrictRadius = -1.0F;
-+    @Nullable
-+    private EntitySpawnReason spawnReason;
-+    private boolean spawnCancelled = false;
+@@ -210,6 +_,7 @@
  
-     protected Mob(EntityType<? extends Mob> p_21368_, Level p_21369_) {
-         super(p_21368_, p_21369_);
-@@ -235,7 +_,10 @@
-     }
+    public void m_6710_(@Nullable LivingEntity p_21544_) {
+       this.f_21362_ = p_21544_;
++      net.minecraftforge.common.ForgeHooks.onLivingSetAttackTarget(this, p_21544_);
+    }
  
-     public void setTarget(@Nullable LivingEntity p_21544_) {
--        this.target = p_21544_;
-+        var event = net.minecraftforge.event.ForgeEventFactory.onLivingChangeTargetMob(this, p_21544_);
-+        if (!event.isCanceled()) {
-+            this.target = event.getNewTarget();
-+        }
-     }
- 
-     @Override
-@@ -418,6 +_,10 @@
-         if (this.isNoAi()) {
-             p_21484_.putBoolean("NoAI", this.isNoAi());
-         }
-+
-+        if (this.spawnReason != null) {
-+            p_21484_.putString("forge:spawn_type", this.spawnReason.name());
-+        }
-     }
- 
-     @Override
-@@ -484,6 +_,14 @@
- 
-         this.lootTableSeed = p_21450_.getLong("DeathLootTableSeed");
-         this.setNoAi(p_21450_.getBoolean("NoAI"));
-+
-+        if (p_21450_.contains("forge:spawn_type")) {
-+            try {
-+                this.spawnReason = EntitySpawnReason.valueOf(p_21450_.getString("forge:spawn_type"));
-+            } catch (Exception ex) {
-+                p_21450_.remove("forge:spawn_type");
-+            }
-+        }
-     }
- 
-     @Override
-@@ -536,7 +_,7 @@
-             && this.canPickUpLoot()
-             && this.isAlive()
-             && !this.dead
--            && serverlevel.getGameRules().getBoolean(GameRules.RULE_MOBGRIEFING)) {
-+            && net.minecraftforge.event.ForgeEventFactory.getMobGriefingEvent(serverlevel, this)) {
-             Vec3i vec3i = this.getPickupReach();
- 
-             for (ItemEntity itementity : this.level()
-@@ -702,6 +_,14 @@
-             this.discard();
-         } else if (!this.isPersistenceRequired() && !this.requiresCustomPersistence()) {
-             Entity entity = this.level().getNearestPlayer(this, -1.0);
-+            var result = net.minecraftforge.event.ForgeEventFactory.canEntityDespawn(this, (ServerLevel)this.level());
-+            if (result == net.minecraftforge.eventbus.api.Event.Result.DENY) {
-+                noActionTime = 0;
-+                entity = null;
-+            } else if (result == net.minecraftforge.eventbus.api.Event.Result.ALLOW) {
-+                this.discard();
-+                entity = null;
-+            }
-             if (entity != null) {
-                 double d0 = entity.distanceToSqr(this);
-                 int i = this.getType().getCategory().getDespawnDistance();
-@@ -1118,6 +_,16 @@
-         }
-     }
- 
-+    /**
-+     * Forge: Override-Only, call via ForgeEventFactory.onFinalizeSpawn.<br>
-+     * Overrides are allowed. Do not wrap super calls within override (as that will cause stack overflows).<br>
-+     * Vanilla calls are replaced with a transformer, and are not visible in source.<br>
-+     * <p>
-+     * Be certain to either call super.finalizeSpawn or set the {@link #spawnReason} field from within your override.
-+     * @see {@link net.minecraftforge.event.ForgeEventFactory#onFinalizeSpawn onFinalizeSpawn} for additional documentation.
-+     */
-+    @Deprecated
-+    @org.jetbrains.annotations.ApiStatus.OverrideOnly
-     @Nullable
-     public SpawnGroupData finalizeSpawn(ServerLevelAccessor p_21434_, DifficultyInstance p_21435_, EntitySpawnReason p_369316_, @Nullable SpawnGroupData p_21437_) {
-         RandomSource randomsource = p_21434_.getRandom();
-@@ -1129,6 +_,7 @@
-         }
- 
-         this.setLeftHanded(randomsource.nextFloat() < 0.05F);
-+        this.spawnReason = p_369316_;
-         return p_21437_;
-     }
- 
-@@ -1439,15 +_,25 @@
-         return false;
-     }
- 
-+    @Deprecated // FORGE: use jumpInFluid instead
-     @Override
-     protected void jumpInLiquid(TagKey<Fluid> p_204045_) {
-+        this.jumpInLiquidInternal(() -> super.jumpInLiquid(p_204045_));
-+    }
-+
-+    private void jumpInLiquidInternal(Runnable onSuper) {
-         if (this.getNavigation().canFloat()) {
--            super.jumpInLiquid(p_204045_);
-+            onSuper.run();
-         } else {
-             this.setDeltaMovement(this.getDeltaMovement().add(0.0, 0.3, 0.0));
-         }
-     }
- 
-+    @Override
-+    public void jumpInFluid(net.minecraftforge.fluids.FluidType type) {
-+       this.jumpInLiquidInternal(() -> super.jumpInFluid(type));
-+    }
-+
-     @VisibleForTesting
-     public void removeFreeWill() {
-         this.removeAllGoals(p_341273_ -> true);
-@@ -1473,6 +_,41 @@
-     public ItemStack getPickResult() {
-         SpawnEggItem spawneggitem = SpawnEggItem.byId(this.getType());
-         return spawneggitem == null ? null : new ItemStack(spawneggitem);
-+    }
-+
-+    /**
-+    * Returns the type of spawn that created this mob, if applicable.
-+    * If it could not be determined, this will return null.
-+    * <p>
-+    * This is set via {@link Mob#finalizeSpawn}, so you should not call this from within that method, instead using the parameter.
-+    */
-+    @Nullable
-+    public final EntitySpawnReason getSpawnReason() {
-+        return this.spawnReason;
-+    }
-+
-+    /**
-+     * This method exists so that spawns can be cancelled from the {@link net.minecraftforge.event.entity.living.MobSpawnEvent.FinalizeSpawn FinalizeSpawnEvent}
-+     * without needing to hook up an additional handler for the {@link net.minecraftforge.event.entity.EntityJoinLevelEvent EntityJoinLevelEvent}.
-+     * @return if this mob will be blocked from spawning during {@link Level#addFreshEntity(Entity)}
-+     * @apiNote Not public-facing API.
-+     */
-+    @org.jetbrains.annotations.ApiStatus.Internal
-+    public final boolean isSpawnCancelled() {
-+        return this.spawnCancelled;
-+    }
-+
-+    /**
-+     * Marks this mob as being disallowed to spawn during {@link Level#addFreshEntity(Entity)}.<p>
-+     * @throws UnsupportedOperationException if this entity has already been {@link Entity#isAddedToWorld() added to the world}.
-+     * @apiNote Not public-facing API.
-+     */
-+    @org.jetbrains.annotations.ApiStatus.Internal
-+    public final void setSpawnCancelled(boolean cancel) {
-+        if (this.isAddedToWorld()) {
-+            throw new UnsupportedOperationException("Late invocations of Mob#setSpawnCancelled are not permitted.");
-+        }
-+        this.spawnCancelled = cancel;
-     }
- 
-     @Override
+    public boolean m_6549_(EntityType<?> p_21399_) {
+@@ -521,7 +_,7 @@
+    public void m_8107_() {
+       super.m_8107_();
+       this.f_19853_.m_46473_().m_6180_("looting");
+-      if (!this.f_19853_.f_46443_ && this.m_21531_() && this.m_6084_() && !this.f_20890_ && this.f_19853_.m_46469_().m_46207_(GameRules.f_46132_)) {
++      if (!this.f_19853_.f_46443_ && this.m_21531_() && this.m_6084_() && !this.f_20890_ && net.minecraftforge.event.ForgeEventFactory.getMobGriefingEvent(this.f_19853_, this)) {
+          for(ItemEntity itementity : this.f_19853_.m_45976_(ItemEntity.class, this.m_142469_().m_82377_(1.0D, 0.0D, 1.0D))) {
+             if (!itementity.m_146910_() && !itementity.m_32055_().m_41619_() && !itementity.m_32063_() && this.m_7243_(itementity.m_32055_())) {
+                this.m_7581_(itementity);
+@@ -674,6 +_,14 @@
+          this.m_146870_();
+       } else if (!this.m_21532_() && !this.m_8023_()) {
+          Entity entity = this.f_19853_.m_45930_(this, -1.0D);
++         net.minecraftforge.eventbus.api.Event.Result result = net.minecraftforge.event.ForgeEventFactory.canEntityDespawn(this);
++         if (result == net.minecraftforge.eventbus.api.Event.Result.DENY) {
++            f_20891_ = 0;
++            entity = null;
++         } else if (result == net.minecraftforge.eventbus.api.Event.Result.ALLOW) {
++            this.m_146870_();
++            entity = null;
++         }
+          if (entity != null) {
+             double d0 = entity.m_20280_(this);
+             int i = this.m_6095_().m_20674_().m_21611_();

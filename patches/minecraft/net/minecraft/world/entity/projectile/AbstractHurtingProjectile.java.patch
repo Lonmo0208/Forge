@@ -1,11 +1,11 @@
 --- a/net/minecraft/world/entity/projectile/AbstractHurtingProjectile.java
 +++ b/net/minecraft/world/entity/projectile/AbstractHurtingProjectile.java
-@@ -86,7 +_,7 @@
-                 this.igniteForSeconds(1.0F);
-             }
+@@ -64,7 +_,7 @@
+          }
  
--            if (hitresult.getType() != HitResult.Type.MISS && this.isAlive()) {
-+            if (hitresult.getType() != HitResult.Type.MISS && this.isAlive() && !net.minecraftforge.event.ForgeEventFactory.onProjectileImpact(this, hitresult)) {
-                 this.hitTargetOrDeflectSelf(hitresult);
-             }
+          HitResult hitresult = ProjectileUtil.m_37294_(this, this::m_5603_);
+-         if (hitresult.m_6662_() != HitResult.Type.MISS) {
++         if (hitresult.m_6662_() != HitResult.Type.MISS && !net.minecraftforge.event.ForgeEventFactory.onProjectileImpact(this, hitresult)) {
+             this.m_6532_(hitresult);
+          }
  

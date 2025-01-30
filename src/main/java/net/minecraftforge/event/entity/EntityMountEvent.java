@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Forge Development LLC and contributors
+ * Minecraft Forge - Forge Development LLC
  * SPDX-License-Identifier: LGPL-2.1-only
  */
 
@@ -30,16 +30,16 @@ public class EntityMountEvent extends EntityEvent
 
     private final Entity entityMounting;
     private final Entity entityBeingMounted;
-    private final Level level;
+    private final Level worldObj;
 
     private final boolean isMounting;
 
-    public EntityMountEvent(Entity entityMounting, Entity entityBeingMounted, Level level, boolean isMounting)
+    public EntityMountEvent(Entity entityMounting, Entity entityBeingMounted, Level entityWorld, boolean isMounting)
     {
         super(entityMounting);
         this.entityMounting = entityMounting;
         this.entityBeingMounted = entityBeingMounted;
-        this.level = level;
+        this.worldObj = entityWorld;
         this.isMounting = isMounting;
     }
 
@@ -63,8 +63,8 @@ public class EntityMountEvent extends EntityEvent
         return entityBeingMounted;
     }
 
-    public Level getLevel()
+    public Level getWorldObj()
     {
-        return level;
+        return worldObj;
     }
 }

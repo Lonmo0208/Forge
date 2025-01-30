@@ -1,12 +1,13 @@
 /*
- * Copyright (c) Forge Development LLC and contributors
+ * Minecraft Forge - Forge Development LLC
  * SPDX-License-Identifier: LGPL-2.1-only
  */
 
 package net.minecraftforge.fluids;
 
+import javax.annotation.Nonnull;
+
 import net.minecraft.world.item.ItemStack;
-import org.jetbrains.annotations.NotNull;
 
 /**
  * Holds the result of a fluid action from {@link FluidUtil}.
@@ -22,15 +23,15 @@ public class FluidActionResult
 	public static final FluidActionResult FAILURE = new FluidActionResult(false, ItemStack.EMPTY);
 
 	public final boolean success;
-	@NotNull
+	@Nonnull
 	public final ItemStack result;
 
-	public FluidActionResult(@NotNull ItemStack result)
+	public FluidActionResult(@Nonnull ItemStack result)
 	{
 		this(true, result);
 	}
 
-	private FluidActionResult(boolean success, @NotNull ItemStack result)
+	private FluidActionResult(boolean success, @Nonnull ItemStack result)
 	{
 		this.success = success;
 		this.result = result;
@@ -41,7 +42,7 @@ public class FluidActionResult
 		return success;
 	}
 
-	@NotNull
+	@Nonnull
 	public ItemStack getResult()
 	{
 		return result;

@@ -1,109 +1,104 @@
 /*
- * Copyright (c) Forge Development LLC and contributors
+ * Minecraft Forge - Forge Development LLC
  * SPDX-License-Identifier: LGPL-2.1-only
  */
 
 package net.minecraftforge.common.data;
 
-import com.google.common.collect.ImmutableList;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonObject;
-import com.mojang.serialization.JsonOps;
 import cpw.mods.modlauncher.api.LamdbaExceptionUtils;
-import net.minecraft.core.HolderLookup;
-import net.minecraft.data.CachedOutput;
+import net.minecraft.data.DataGenerator;
+import net.minecraft.data.HashCache;
 import net.minecraft.data.DataProvider;
-import net.minecraft.data.PackOutput;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.util.Tuple;
+import net.minecraftforge.common.loot.GlobalLootModifierSerializer;
 import net.minecraftforge.common.loot.IGlobalLootModifier;
 import net.minecraftforge.common.loot.LootModifier;
 
+import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
 /**
- * Provider for forge's GlobalLootModifier system. See {@link LootModifier}
+ * Provider for forge's GlobalLootModifier system. See {@link LootModifier} and {@link GlobalLootModifierSerializer}.
  *
  * This provider only requires implementing {@link #start()} and calling {@link #add} from it.
  */
-public abstract class GlobalLootModifierProvider implements DataProvider {
+public abstract class GlobalLootModifierProvider implements DataProvider
+{
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
-    private final PackOutput output;
+    private final DataGenerator gen;
     private final String modid;
-    private final CompletableFuture<HolderLookup.Provider> registries;
-    private final Map<String, IGlobalLootModifier> toSerialize = new HashMap<>();
+    private final Map<String, Tuple<GlobalLootModifierSerializer<?>, JsonObject>> toSerialize = new HashMap<>();
     private boolean replace = false;
 
-    public GlobalLootModifierProvider(PackOutput output, String modid, CompletableFuture<HolderLookup.Provider> registries) {
-        this.output = output;
+    public GlobalLootModifierProvider(DataGenerator gen, String modid)
+    {
+        this.gen = gen;
         this.modid = modid;
-        this.registries = registries;
     }
 
     /**
      * Sets the "replace" key in global_loot_modifiers to true.
      */
-    protected void replacing() {
+    protected void replacing()
+    {
         this.replace = true;
     }
 
     /**
      * Call {@link #add} here, which will pass in the necessary information to write the jsons.
      */
-    protected abstract void start(HolderLookup.Provider registries);
+    protected abstract void start();
 
     @Override
-    public CompletableFuture<?> run(CachedOutput cache) {
-        return this.registries.thenCompose(p -> this.run(cache, p));
-    }
+    public void run(HashCache cache) throws IOException
+    {
+        start();
 
-    private CompletableFuture<?> run(CachedOutput cache, HolderLookup.Provider registries) {
-        start(registries);
-
-        Path forgePath = this.output.getOutputFolder(PackOutput.Target.DATA_PACK).resolve("forge/loot_modifiers/global_loot_modifiers.json");
-        Path modifierFolderPath = this.output.getOutputFolder(PackOutput.Target.DATA_PACK).resolve(this.modid).resolve("loot_modifiers");
+        Path forgePath = gen.getOutputFolder().resolve("data/forge/loot_modifiers/global_loot_modifiers.json");
+        String modPath = "data/" + modid + "/loot_modifiers/";
         List<ResourceLocation> entries = new ArrayList<>();
 
-        ImmutableList.Builder<CompletableFuture<?>> futuresBuilder = new ImmutableList.Builder<>();
+        toSerialize.forEach(LamdbaExceptionUtils.rethrowBiConsumer((name, pair) ->
+        {
+            entries.add(new ResourceLocation(modid, name));
+            Path modifierPath = gen.getOutputFolder().resolve(modPath + name + ".json");
 
+            JsonObject json = pair.getB();
+            json.addProperty("type", pair.getA().getRegistryName().toString());
 
-        var ops = registries.createSerializationContext(JsonOps.INSTANCE);
-        var codec = IGlobalLootModifier.DIRECT_CODEC;
-
-        toSerialize.forEach(LamdbaExceptionUtils.rethrowBiConsumer((name, instance) -> {
-            var json = codec.encodeStart(ops, instance).getOrThrow();
-            entries.add(ResourceLocation.fromNamespaceAndPath(modid, name));
-            Path modifierPath = modifierFolderPath.resolve(name + ".json");
-            futuresBuilder.add(DataProvider.saveStable(cache, json, modifierPath));
+            DataProvider.save(GSON, cache, json, modifierPath);
         }));
 
         JsonObject forgeJson = new JsonObject();
         forgeJson.addProperty("replace", this.replace);
         forgeJson.add("entries", GSON.toJsonTree(entries.stream().map(ResourceLocation::toString).collect(Collectors.toList())));
 
-        futuresBuilder.add(DataProvider.saveStable(cache, forgeJson, forgePath));
-
-        return CompletableFuture.allOf(futuresBuilder.build().toArray(CompletableFuture[]::new));
+        DataProvider.save(GSON, cache, forgeJson, forgePath);
     }
 
     /**
      * Passes in the data needed to create the file without any extra objects.
      *
      * @param modifier      The name of the modifier, which will be the file name.
-     * @param instance      The instance to serialize
+     * @param serializer    The serializer of this modifier.
      */
-    public <T extends IGlobalLootModifier> void add(String modifier, T instance) {
-        this.toSerialize.put(modifier, instance);
+    public <T extends IGlobalLootModifier> void add(String modifier, GlobalLootModifierSerializer<T> serializer, T instance)
+    {
+        this.toSerialize.put(modifier, new Tuple<>(serializer, serializer.write(instance)));
     }
 
     @Override
-    public String getName() {
+    public String getName()
+    {
         return "Global Loot Modifiers : " + modid;
     }
 }

@@ -1,6 +1,20 @@
 /*
- * Copyright (c) Forge Development LLC and contributors
- * SPDX-License-Identifier: LGPL-2.1-only
+ * Minecraft Forge
+ * Copyright (c) 2016-2021.
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation version 2.1
+ * of the License.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
 package net.minecraftforge.fml.loading;
@@ -14,8 +28,6 @@ import java.util.List;
  * or server.
  */
 public class EarlyLoadingException extends RuntimeException {
-    private static final long serialVersionUID = 2302192216172508006L;
-
     public static class ExceptionData {
         private final IModInfo modInfo;
         private final String i18message;
@@ -49,7 +61,7 @@ public class EarlyLoadingException extends RuntimeException {
         return errorMessages;
     }
 
-    public EarlyLoadingException(final String message, final Throwable originalException, List<ExceptionData> errorMessages) {
+    EarlyLoadingException(final String message, final Throwable originalException, List<ExceptionData> errorMessages) {
         super(message, originalException);
         this.errorMessages = errorMessages;
     }

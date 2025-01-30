@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Forge Development LLC and contributors
+ * Minecraft Forge - Forge Development LLC
  * SPDX-License-Identifier: LGPL-2.1-only
  */
 
@@ -21,7 +21,7 @@ import net.minecraft.world.level.biome.Biome;
 
 public class BiomeManager
 {
-    private static final TrackedList<BiomeEntry>[] biomes = setupBiomes();
+    private static TrackedList<BiomeEntry>[] biomes = setupBiomes();
     private static final List<ResourceKey<Biome>> additionalOverworldBiomes = new ArrayList<>();
     private static final List<ResourceKey<Biome>> additionalOverworldBiomesView = Collections.unmodifiableList(additionalOverworldBiomes);
 

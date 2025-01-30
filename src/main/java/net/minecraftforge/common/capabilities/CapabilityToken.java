@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Forge Development LLC and contributors
+ * Minecraft Forge - Forge Development LLC
  * SPDX-License-Identifier: LGPL-2.1-only
  */
 
@@ -21,13 +21,16 @@ import net.minecraftforge.fml.common.asm.CapabilityTokenSubclass;
  * }</pre>
  *
  */
-public abstract class CapabilityToken<T> {
-    protected final String getType() {
+public abstract class CapabilityToken<T>
+{
+    protected final String getType()
+    {
         throw new RuntimeException("This will be implemented by a transformer");
     }
 
     @Override
-    public String toString() {
+    public String toString()
+    {
         return "CapabilityToken[" + getType() + "]";
     }
 }

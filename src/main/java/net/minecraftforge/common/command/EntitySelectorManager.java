@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Forge Development LLC and contributors
+ * Minecraft Forge - Forge Development LLC
  * SPDX-License-Identifier: LGPL-2.1-only
  */
 
@@ -13,8 +13,6 @@ import net.minecraft.commands.arguments.selector.EntitySelectorParser;
 
 import java.util.Arrays;
 import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
 
 /**
  * Allows modders to register custom entity selectors by assigning an {@link IEntitySelectorType} to a String token. <br>
@@ -23,7 +21,6 @@ import java.util.Map;
 public class EntitySelectorManager
 {
     private static final HashMap<String, IEntitySelectorType> REGISTRY = new HashMap<>();
-    private static final List<String> RESERVED_TOKENS = List.of("p", "a", "r", "s", "e");
 
     /**
      * Registers a new {@link IEntitySelectorType} for the given {@code token}.<br>
@@ -37,7 +34,7 @@ public class EntitySelectorManager
             throw new IllegalArgumentException("Token must not be empty");
         }
 
-        if (RESERVED_TOKENS.contains(token))
+        if (Arrays.asList("p", "a", "r", "s", "e").contains(token))
         {
             throw new IllegalArgumentException("Token clashes with vanilla @" + token);
         }
@@ -81,10 +78,6 @@ public class EntitySelectorManager
      */
     public static void fillSelectorSuggestions(SuggestionsBuilder suggestionBuilder)
     {
-        for (var entry : REGISTRY.entrySet()) {
-            String token = entry.getKey();
-            IEntitySelectorType type = entry.getValue();
-            suggestionBuilder.suggest("@" + token, type.getSuggestionTooltip());
-        }
+        REGISTRY.forEach((token, type) -> suggestionBuilder.suggest("@" + token, type.getSuggestionTooltip()));
     }
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Forge Development LLC and contributors
+ * Minecraft Forge - Forge Development LLC
  * SPDX-License-Identifier: LGPL-2.1-only
  */
 
@@ -8,7 +8,8 @@ package net.minecraftforge.items.wrapper;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.item.ItemStack;
-import org.jetbrains.annotations.NotNull;
+
+import javax.annotation.Nonnull;
 
 public class PlayerArmorInvWrapper extends RangedWrapper
 {
@@ -21,13 +22,13 @@ public class PlayerArmorInvWrapper extends RangedWrapper
     }
 
     @Override
-    @NotNull
-    public ItemStack insertItem(int slot, @NotNull ItemStack stack, boolean simulate)
+    @Nonnull
+    public ItemStack insertItem(int slot, @Nonnull ItemStack stack, boolean simulate)
     {
         EquipmentSlot equ = null;
         for (EquipmentSlot s : EquipmentSlot.values())
         {
-            if (s.getType() == EquipmentSlot.Type.HUMANOID_ARMOR && s.getIndex() == slot)
+            if (s.getType() == EquipmentSlot.Type.ARMOR && s.getIndex() == slot)
             {
                 equ = s;
                 break;

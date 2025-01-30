@@ -1,12 +1,11 @@
 /*
- * Copyright (c) Forge Development LLC and contributors
+ * Minecraft Forge - Forge Development LLC
  * SPDX-License-Identifier: LGPL-2.1-only
  */
 
 package net.minecraftforge.event.entity.player;
 
 import java.io.File;
-import java.util.Optional;
 
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.item.ItemEntity;
@@ -24,11 +23,12 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraftforge.event.entity.living.LivingEvent;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
+
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 
 /**
- * PlayerEvent is fired whenever an event involving a {@link Player} occurs. <br>
+ * PlayerEvent is fired whenever an event involving Living entities occurs. <br>
  * If a method utilizes this {@link net.minecraftforge.eventbus.api.Event} as its parameter, the method will
  * receive every child event of this class.<br>
  * <br>
@@ -36,20 +36,17 @@ import org.jetbrains.annotations.Nullable;
  **/
 public class PlayerEvent extends LivingEvent
 {
-    private final Player player;
-
+    private final Player entityPlayer;
     public PlayerEvent(Player player)
     {
         super(player);
-        this.player = player;
+        entityPlayer = player;
     }
 
-    @Override
-    public Player getEntity()
-    {
-        return player;
-    }
-
+    /**
+     * @return Player
+     */
+    public Player getPlayer() { return entityPlayer; }
     /**
      * HarvestCheck is fired when a player attempts to harvest a block.<br>
      * This event is fired whenever a player attempts to harvest a block in
@@ -93,7 +90,7 @@ public class PlayerEvent extends LivingEvent
      * {@link #state} contains the block being broken. <br>
      * {@link #originalSpeed} contains the original speed at which the player broke the block. <br>
      * {@link #newSpeed} contains the newSpeed at which the player will break the block. <br>
-     * {@link #pos} contains the coordinates at which this event is occurring. Optional value.<br>
+     * {@link #pos} contains the coordinates at which this event is occurring. Y value -1 means location is unknown.<br>
      * <br>
      * This event is {@link net.minecraftforge.eventbus.api.Cancelable}.<br>
      * If it is canceled, the player is unable to break the block.<br>
@@ -105,26 +102,25 @@ public class PlayerEvent extends LivingEvent
     @Cancelable
     public static class BreakSpeed extends PlayerEvent
     {
-        private static final BlockPos LEGACY_UNKNOWN = new BlockPos(0, -1, 0);
         private final BlockState state;
         private final float originalSpeed;
         private float newSpeed = 0.0f;
-        private final Optional<BlockPos> pos; // Y position of -1 notes unknown location
+        private final BlockPos pos; // Y position of -1 notes unknown location
 
-        public BreakSpeed(Player player, BlockState state, float original, @Nullable BlockPos pos)
+        public BreakSpeed(Player player, BlockState state, float original, BlockPos pos)
         {
             super(player);
             this.state = state;
             this.originalSpeed = original;
             this.setNewSpeed(original);
-            this.pos = Optional.ofNullable(pos);
+            this.pos = pos != null ? pos : new BlockPos(0, -1, 0);
         }
 
         public BlockState getState() { return state; }
         public float getOriginalSpeed() { return originalSpeed; }
         public float getNewSpeed() { return newSpeed; }
         public void setNewSpeed(float newSpeed) { this.newSpeed = newSpeed; }
-        public Optional<BlockPos> getPosition() { return this.pos; }
+        public BlockPos getPos() { return pos; }
     }
 
     /**
@@ -148,7 +144,7 @@ public class PlayerEvent extends LivingEvent
         private final Component username;
         private Component displayname;
 
-        public NameFormat(Player player, Component username)
+        public NameFormat(Player player, Component username) 
         {
             super(player);
             this.username = username;
@@ -195,7 +191,7 @@ public class PlayerEvent extends LivingEvent
         {
             super(player);
         }
-
+        
         @Nullable
         public Component getDisplayName()
         {
@@ -412,17 +408,17 @@ public class PlayerEvent extends LivingEvent
     }
 
     public static class ItemCraftedEvent extends PlayerEvent {
-        @NotNull
+        @Nonnull
         private final ItemStack crafting;
         private final Container craftMatrix;
-        public ItemCraftedEvent(Player player, @NotNull ItemStack crafting, Container craftMatrix)
+        public ItemCraftedEvent(Player player, @Nonnull ItemStack crafting, Container craftMatrix)
         {
             super(player);
             this.crafting = crafting;
             this.craftMatrix = craftMatrix;
         }
 
-        @NotNull
+        @Nonnull
         public ItemStack getCrafting()
         {
             return this.crafting;
@@ -435,15 +431,15 @@ public class PlayerEvent extends LivingEvent
     }
 
     public static class ItemSmeltedEvent extends PlayerEvent {
-        @NotNull
+        @Nonnull
         private final ItemStack smelting;
-        public ItemSmeltedEvent(Player player, @NotNull ItemStack crafting)
+        public ItemSmeltedEvent(Player player, @Nonnull ItemStack crafting)
         {
             super(player);
             this.smelting = crafting;
         }
 
-        @NotNull
+        @Nonnull
         public ItemStack getSmelting()
         {
             return this.smelting;
