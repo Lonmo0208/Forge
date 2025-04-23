@@ -26,7 +26,7 @@ abstract class LauncherJson extends DefaultTask {
         input.from(project.configurations.installer)
         input.from(project.configurations.installerextra)
         configure {
-            def mc    = project.rootProject.ext.MC_VERSION
+            def mc    = 'project.rootProject.ext.25w14craftmine'
             def forge = project.rootProject.ext.FORGE_VERSION
             def timestamp = iso8601Now()
             json.putAll([
@@ -70,6 +70,12 @@ abstract class LauncherJson extends DefaultTask {
                     url: "https://maven.minecraftforge.net/$info.path",
                     sha1: packed.archiveFile.get().asFile.sha1(),
                     size: packed.archiveFile.get().asFile.length()
+                ],
+                artifact: [
+                        path: info.path,
+                        url: "https://maven.neoforged.net/$info.path",
+                        sha1: packed.archiveFile.get().asFile.sha1(),
+                        size: packed.archiveFile.get().asFile.length()
                 ]
             ]
         ])

@@ -156,7 +156,7 @@ tasks.named('extractRangeMap').configure {
 patcher {
     excs.from file("$rootDir/src/main/resources/forge.exc")
     parent = project(':mcp')
-    mcVersion = MC_VERSION
+    mcVersion = '25w14craftmine'
     mappings channel: MAPPING_CHANNEL, version: MAPPING_VERSION
     patches = file("$rootDir/patches/minecraft")
     patchedSrc = file('src/main/java')
@@ -366,8 +366,8 @@ tasks.register('downloadVersionManifest', Download) {
 tasks.register('downloadJson', Download) {
     dependsOn downloadVersionManifest
     inputs.file downloadVersionManifest.dest
-    src { downloadVersionManifest.dest.json.versions.find { it.id == MC_VERSION }.url }
-    dest file("build/versions/$MC_VERSION/version.json")
+    src { downloadVersionManifest.dest.json.versions.find { it.id == '25w14craftmine' }.url }
+    dest file("build/versions/25w14craftmine/version.json")
     useETag 'all'
     onlyIfModified true
     quiet true
@@ -376,7 +376,7 @@ tasks.register('downloadClientRaw', Download) {
     dependsOn downloadJson
     inputs.file downloadJson.dest
     src { downloadJson.dest.json.downloads.client.url }
-    dest file("build/versions/$MC_VERSION/client.jar")
+    dest file("build/versions/25w14craftmine/client.jar")
     useETag 'all'
     onlyIfModified true
     quiet true
@@ -385,7 +385,7 @@ tasks.register('downloadServerRaw', Download) {
     dependsOn downloadJson
     inputs.file downloadJson.dest
     src { downloadJson.dest.json.downloads.server.url }
-    dest file("build/versions/$MC_VERSION/server-bundled.jar")
+    dest file("build/versions/25w14craftmine/server-bundled.jar")
     useETag 'all'
     onlyIfModified true
     quiet true
@@ -393,8 +393,8 @@ tasks.register('downloadServerRaw', Download) {
 tasks.register('extractServer', ExtractFile) {
     dependsOn downloadServerRaw
     input = downloadServerRaw.dest
-    target = "META-INF/versions/$MC_VERSION/server-${MC_VERSION}.jar"
-    output = file("build/versions/$MC_VERSION/server.jar")
+    target = "META-INF/versions/25w14craftmine/server-25w14craftmine.jar"
+    output = file("build/versions/25w14craftmine/server.jar")
 }
 tasks.register('downloadLibraries', DownloadLibraries) {
     dependsOn downloadJson
@@ -423,7 +423,7 @@ tasks.register("findFinalizeSpawnTargets", BytecodePredicateFinder) {
 }
 tasks.register('validateDeprecations', ValidateDeprecations) {
     input = tasks.jar.archiveFile
-    mcVersion = MC_VERSION
+    mcVersion = '25w14craftmine'
 }
 tasks.named('jar', Jar).configure {
     finalizedBy 'validateDeprecations'
@@ -439,17 +439,17 @@ tasks.register("downloadServerShim", DownloadMavenArtifact) {
 tasks.register('downloadClientMappings', net.minecraftforge.gradle.common.tasks.JarExec) {
     ext.output = file('build/client_mappings.tsrg')
     tool = INSTALLER_TOOLS + ':fatjar'
-    args = ['--task', 'DOWNLOAD_MOJMAPS', '--sanitize', '--version', MC_VERSION, '--side', 'client', '--output', output.absolutePath]
+    args = ['--task', 'DOWNLOAD_MOJMAPS', '--sanitize', '--version', '25w14craftmine', '--side', 'client', '--output', output.absolutePath]
     outputs.file(output)
 }
 tasks.register('downloadServerMappings', net.minecraftforge.gradle.common.tasks.JarExec) {
     ext.output = file('build/server_mappings.tsrg')
     tool = INSTALLER_TOOLS + ':fatjar'
-    args = ['--task', 'DOWNLOAD_MOJMAPS', '--sanitize', '--version', MC_VERSION, '--side', 'server', '--output', output.absolutePath]
+    args = ['--task', 'DOWNLOAD_MOJMAPS', '--sanitize', '--version', '25w14craftmine', '--side', 'server', '--output', output.absolutePath]
     outputs.file(output)
 }
 tasks.register("createJoinedSRG", DownloadMavenArtifact) {
-    artifact = "net.minecraft:joined:${MC_VERSION}-${MCP_VERSION}:srg"
+    artifact = "net.minecraft:joined:25w14craftmine-${MCP_VERSION}:srg"
 }
 tasks.register("createClientOfficial", RenameJar) {
     tool = FART + ':all'
@@ -573,7 +573,7 @@ tasks.named('genPatches', GeneratePatches).configure {
 }
 
 def baseForgeVersionProperty = project.objects.property(String)
-baseForgeVersionProperty.set(project.provider { TeamcityRequests.attemptFindBase(rootDir) ?: getLatestForgeVersion(MC_VERSION) })
+baseForgeVersionProperty.set(project.provider { TeamcityRequests.attemptFindBase(rootDir) ?: getLatestForgeVersion(25w14craftmine) })
 baseForgeVersionProperty.finalizeValueOnRead()
 final jarCompatibilityTaskSetup = { Task task ->
     task.group = 'jar compatibility'
@@ -665,28 +665,28 @@ tasks.register('installerJson', InstallerJson) {
             profile: project.name,
             version: launcherJson.json.id,
             path: Util.getMavenInfoFromTask(tasks.serverShimJar).name,
-            minecraft: MC_VERSION,
+            minecraft: '25w14craftmine',
             serverJarPath: '{LIBRARY_DIR}/net/minecraft/server/{MINECRAFT_VERSION}/server-{MINECRAFT_VERSION}-bundled.jar',
             data: [
                 MOJMAPS: [
-                    client: "[net.minecraft:client:${MC_VERSION}:mappings@tsrg]",
-                    server: "[net.minecraft:server:${MC_VERSION}:mappings@tsrg]"
+                    client: "[net.minecraft:client:25w14craftmine:mappings@tsrg]",
+                    server: "[net.minecraft:server:25w14craftmine:mappings@tsrg]"
                 ],
                 MOJMAPS_SHA: [
                     client: "'${downloadClientMappings.output.sha1}'",
                     server: "'${downloadServerMappings.output.sha1}'"
                 ],
                 MC_UNPACKED: [
-                    client: "[net.minecraft:client:${MC_VERSION}]",
-                    server: "[net.minecraft:server:${MC_VERSION}:unpacked]"
+                    client: "[net.minecraft:client:25w14craftmine]",
+                    server: "[net.minecraft:server:25w14craftmine:unpacked]"
                 ],
                 MC_UNPACKED_SHA: [
                     client: "'${downloadClientRaw.dest.sha1}'",
                     server: "'${extractServer.output.get().asFile.sha1}'"
                 ],
                 MC_OFF: [
-                    client: "[net.minecraft:client:${MC_VERSION}:official]",
-                    server: "[net.minecraft:server:${MC_VERSION}:official]"
+                    client: "[net.minecraft:client:25w14craftmine:official]",
+                    server: "[net.minecraft:server:25w14craftmine:official]"
                 ],
                 MC_OFF_SHA: [
                     client: "'${createClientOfficial.output.get().asFile.sha1}'",
@@ -763,7 +763,7 @@ tasks.register('installerJson', InstallerJson) {
                     args: [
                         '--task', 'DOWNLOAD_MOJMAPS',
                         '--sanitize',
-                        '--version', MC_VERSION,
+                        '--version', '25w14craftmine',
                         '--side', '{SIDE}',
                         '--output', '{MOJMAPS}'
                     ],
@@ -861,10 +861,10 @@ tasks.named('universalJar').configure {
         attributes([
             'Specification-Title':   'Minecraft',
             'Specification-Vendor':  'Forge Development LLC',
-            'Specification-Version':  MC_VERSION,
+            'Specification-Version':  '25w14craftmine',
             'Implementation-Title':  'MCP',
             'Implementation-Vendor': 'Forge Development LLC',
-            'Implementation-Version': MCP_VERSION
+            'Implementation-Version': '25w14craftmine'
         ] as LinkedHashMap, 'net/minecraftforge/versions/mcp/')
     }
     jarSigner.sign(it)
@@ -944,7 +944,7 @@ tasks.register('mdkZip', Zip) {
             FORGE_VERSION: FORGE_VERSION,
             FORGE_GROUP: project.group,
             FORGE_NAME: project.name,
-            MC_VERSION: MC_VERSION,
+            MC_VERSION: '25w14craftmine',
             MAPPING_CHANNEL: MAPPING_CHANNEL,
             MAPPING_VERSION: MAPPING_VERSION,
             FORGE_SPEC_VERSION: SPEC_VERSION.split("\\.")[0],
@@ -1057,8 +1057,8 @@ tasks.named('javadoc', Javadoc).configure {
 
         bottom = "Minecraft Forge is an open source modding API for Minecraft: Java Edition, licensed under the Lesser GNU General Public License, version 2.1."
         windowTitle = "Minecraft Forge API ${VERSION}"
-        docTitle = "Minecraft Forge API - ${FORGE_VERSION} for Minecraft ${MC_VERSION}"
-        header = "<div style=\"margin-top: 9px;padding: 5px 6px;\"><strong>${FORGE_VERSION} for Minecraft ${MC_VERSION}</strong></div>"
+        docTitle = "Minecraft Forge API - ${FORGE_VERSION} for Minecraft 25w14craftmine"
+        header = "<div style=\"margin-top: 9px;padding: 5px 6px;\"><strong>${FORGE_VERSION} for Minecraft 25w14craftmine}</strong></div>"
     }
 
     doLast {

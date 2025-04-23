@@ -97,7 +97,7 @@ tasks.register('writeForgeVersionJson') {
     doLast {
         file('src/main/resources/forge_version.json').json = [
             forge: FORGE_VERSION,
-            mc: MC_VERSION,
+            mc: '25w14craftmine',
             mcp: MCP_VERSION
         ]
     }

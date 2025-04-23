@@ -19,7 +19,7 @@ dependencies {
 
 patcher {
 	parent = project(':mcp')
-	mcVersion = MC_VERSION
+	mcVersion = 25w14craftmine
 	patchedSrc = file('src/main/java')
 
 	mappings channel: MAPPING_CHANNEL, version: MAPPING_VERSION
@@ -34,7 +34,7 @@ patcher {
 			workingDirectory project.file('run/client')
 
 			args '--gameDir', '.'
-			args '--version', MC_VERSION
+			args '--version', '25w14craftmine'
 			args '--assetsDir', downloadAssets.output
 			args '--assetIndex', '{asset_index}'
 			args '--accessToken', '0'

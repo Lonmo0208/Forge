@@ -56,6 +56,12 @@ abstract class InstallerJson extends DefaultTask {
                         url: "https://maven.minecraftforge.net/$info.path",
                         sha1: packed.archiveFile.get().asFile.sha1(),
                         size: packed.archiveFile.get().asFile.length()
+                    ],
+                    artifact: [
+                            path: info.path,
+                            url: "https://maven.neoforged.net/$info.path",
+                            sha1: packed.archiveFile.get().asFile.sha1(),
+                            size: packed.archiveFile.get().asFile.length()
                     ]
                 ]
             ])

@@ -17,8 +17,8 @@ Util.init() //Init all our extension methods!
 
 ext {
     GIT_INFO = gradleutils.gitInfo
-    VERSION = gradleutils.getFilteredMCTagOffsetBranchVersion(true, '[0-9]', MC_VERSION)
-    FORGE_VERSION = VERSION.substring(MC_VERSION.length() + 1)
+    VERSION = gradleutils.getFilteredMCTagOffsetBranchVersion(true, '[0-9]', '25w14craftmine')
+    FORGE_VERSION = VERSION.substring('25w14craftmine'.length() + 1)
 }
 
 changelog {
@@ -39,7 +39,7 @@ tasks.register('doChecks') {
 project(':mcp') {
     apply plugin: 'net.minecraftforge.gradle.mcp'
     mcp {
-        config MC_VERSION + '-' + MCP_VERSION
+        config '25w14craftmine' + '-' + MCP_VERSION
         pipeline = 'joined'
     }
 }
